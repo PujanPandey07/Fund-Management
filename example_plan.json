@@ -1,0 +1,94 @@
+{
+  "plan": {
+    "plan_name": "Housing Reconstruction",
+    "plan_version": 1,
+    "disaster_name": "Gorkha Earthquake",
+    "disaster_date_range": { "start": "2015-04-25", "end": "2015-05-12" },
+    "effective_date_range": { "start": "2015-09-01", "end": null },
+    "affected_areas": [
+      { "district": "Gorkha" },
+      {
+        "district": "Sindhupalchok",
+        "local_levels": [
+          { "name": "Melamchi Municipality", "wards": [1, 2, 3] },
+          { "name": "Helambu Rural Municipality" }
+        ]
+      }
+    ]
+  },
+
+  "government": {
+    "federal": { "name": "Government of Nepal" },
+    "provinces": [
+      { "name": "Bagmati Province" },
+      { "name": "Gandaki Province" }
+    ],
+    "districts": [
+      { "name": "Gorkha", "province": "Gandaki Province", "region": "Pahad" },
+      { "name": "Sindhupalchok", "province": "Bagmati Province", "region": "Pahad" }
+    ],
+    "local_levels": [
+      { "name": "Gorkha Municipality", "district": "Gorkha" },
+      { "name": "Melamchi Municipality", "district": "Sindhupalchok" },
+      { "name": "Helambu Rural Municipality", "district": "Sindhupalchok" }
+    ]
+  },
+
+  "regions": ["Himal", "Pahad", "Terai"],
+  "disaster_types": ["Earthquake"],
+  "solution_types": ["Reconstruction", "Retrofitting"],
+
+  "grant_matrix": [
+    {
+      "region": "Himal", "disaster_type": "Earthquake", "solution_type": "Reconstruction",
+      "tranches": [
+        { "stage": "shelter", "amount": 20000 },
+        { "stage": "shelter", "amount": 20000 },
+        { "stage": "main", "amount": 120000 },
+        { "stage": "main", "amount": 120000 },
+        { "stage": "main", "amount": 120000 }
+      ]
+    },
+    {
+      "region": "Himal", "disaster_type": "Earthquake", "solution_type": "Retrofitting",
+      "tranches": [
+        { "stage": "main", "amount": 60000 },
+        { "stage": "main", "amount": 60000 }
+      ]
+    },
+    {
+      "region": "Pahad", "disaster_type": "Earthquake", "solution_type": "Reconstruction",
+      "tranches": [
+        { "stage": "shelter", "amount": 15000 },
+        { "stage": "shelter", "amount": 15000 },
+        { "stage": "main", "amount": 100000 },
+        { "stage": "main", "amount": 100000 },
+        { "stage": "main", "amount": 70000 }
+      ]
+    },
+    {
+      "region": "Pahad", "disaster_type": "Earthquake", "solution_type": "Retrofitting",
+      "tranches": [
+        { "stage": "main", "amount": 50000 },
+        { "stage": "main", "amount": 50000 }
+      ]
+    },
+    {
+      "region": "Terai", "disaster_type": "Earthquake", "solution_type": "Reconstruction",
+      "tranches": [
+        { "stage": "shelter", "amount": 15000 },
+        { "stage": "shelter", "amount": 15000 },
+        { "stage": "main", "amount": 90000 },
+        { "stage": "main", "amount": 90000 },
+        { "stage": "main", "amount": 60000 }
+      ]
+    },
+    {
+      "region": "Terai", "disaster_type": "Earthquake", "solution_type": "Retrofitting",
+      "tranches": [
+        { "stage": "main", "amount": 40000 },
+        { "stage": "main", "amount": 40000 }
+      ]
+    }
+  ]
+}

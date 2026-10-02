@@ -1,0 +1,7 @@
+Metadata-Version: 2.4
+Name: fm-plan
+Version: 0.1.0
+Requires-Python: >=3.10
+Requires-Dist: pydantic>=2
+Provides-Extra: dev
+Requires-Dist: pytest; extra == "dev"
