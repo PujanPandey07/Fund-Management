@@ -347,33 +347,111 @@ Revising a plan means creating a new file with a higher `plan_version`. The new 
 | The government list and the affected areas are separate inputs | The package checks that the affected areas exist in the government list. It does not check that the government list contains every local level of an affected district.                             |
 | `covers` with a ward-limited local level and no ward           | Returns `False`                                                                                                                                                                                     |
 
-## 10. Project layout and tests
+## 10. Package 2: Calculation Engine (`fm_calculation_engine`)
+
+The calculation engine consumes an `ImplementationPlan` alongside beneficiary counts and donations to produce the three primary system outputs.
+
+### 10.1 Output 1: Beneficiary (`receivable_amounts`)
+Calculates the receivable tranche amounts and total grant for an individual beneficiary profile based on their geographical region, disaster type, and solution type.
+
+```python
+from fm_calculation_engine import receivable_amounts
+
+profile = {
+    "plan_id": plan.plan_id,
+    "region": "Pahad",
+    "disaster_type": "Earthquake",
+    "solution_type": "Reconstruction"
+}
+result = receivable_amounts(plan, profile)
+print(result.total)         # 300000
+for t in result.tranches:
+    print(f"Tranche {t.tranche} ({t.stage}): Rs. {t.amount}")
+```
+
+### 10.2 Output 2: Government Liability (`calculate_government_liability`)
+Calculates the liability for Federal, Provincial, or Local government across tranches:
+- **Boundary rules**: Federal is liable for all affected districts; Province is liable only for districts within its province boundary; Local government is liable only for its own district/local level.
+- **Donation offset & rollover**: Donations received from INGO/NGO/donors offset the entity's cash liability. Surplus donations automatically roll over across successive tranches.
+- **District breakdown**: Details the exact gross and net amounts payable to each district per tranche.
+- **Beneficiary summary**: Reports total beneficiaries broken down by region, disaster type, and solution type.
+
+```python
+from fm_calculation_engine import calculate_government_liability
+
+gov_profile = {
+    "plan_id": plan.plan_id,
+    "gov_entity_name": "Government of Nepal",   # or Province or Local Gov name
+    "donations": [
+        {"donor_name": "Red Cross", "amount": 100000, "received_date": "2015-10-01"}
+    ]
+}
+beneficiary_counts = [
+    {
+        "district": "Gorkha",
+        "local_level": "Gorkha Municipality",
+        "region": "Pahad",
+        "disaster_type": "Earthquake",
+        "solution_type": "Reconstruction",
+        "count": 10
+    }
+]
+
+out = calculate_government_liability(plan, gov_profile, beneficiary_counts)
+print(f"Gov Type: {out.gov_type}, Liability %: {out.liability_percentage}%")
+print(f"Total Gross: {out.total_gross_liability}, Net Payable: {out.total_net_payable}")
+for t in out.tranches:
+    print(f"Tranche {t.tranche}: Gross={t.gross_liability}, Donation Used={t.donation_applied}, Net={t.net_payable}")
+```
+
+### 10.3 Output 3: District (`calculate_district_fund`)
+Calculates the collectible funds and local government forwarding responsibilities for a specific district:
+- **Collectibles**: Sums required tranche funds and splits collections by Federal %, Province %, and Local % liability.
+- **Local Government Disbursements**: Breaks down funds to be forwarded to each local government under that district based on beneficiary counts and tranche amounts.
+
+```python
+from fm_calculation_engine import calculate_district_fund
+
+dist_profile = {
+    "plan_id": plan.plan_id,
+    "district_name": "Sindhupalchok"
+}
+
+district_out = calculate_district_fund(plan, dist_profile, beneficiary_counts)
+for t in district_out.tranches:
+    print(f"Tranche {t.tranche} Total: Rs. {t.total_amount}")
+    print(f"  Collectible - Fed: {t.collectible.federal}, Prov: {t.collectible.province}, Local: {t.collectible.local}")
+    for d in t.disbursements:
+        print(f"  Disburse to {d.local_gov}: Rs. {d.amount}")
+```
+
+## 11. Project layout and tests
 
 ```
 Fund-Management/
 ├── README.md
 ├── pyproject.toml
-├── example_plan.json          sample input (values are made up)
+├── example_plan.json               Sample input with government liability %
 ├── src/
-│   └── fm_plan/
-│       ├── __init__.py        exports load_plan, PlanLoadError, ImplementationPlan
-│       ├── __main__.py        enables: python -m fm_plan <file>
-│       ├── loader.py          reads the file and turns problems into readable messages
-│       └── models.py          the templates (Pydantic classes) and all the checks
+│   ├── fm_plan/                    Package 1: Plan models, loader, validation
+│   │   ├── __init__.py
+│   │   ├── __main__.py
+│   │   ├── loader.py
+│   │   └── models.py
+│   └── fm_calculation_engine/      Package 2: Core calculation engine
+│       ├── __init__.py
+│       ├── common.py               Shared models (Donation, BeneficiaryCount, parse)
+│       ├── beneficiary.py          Output 1: Beneficiary receivable amounts
+│       ├── government.py           Output 2: Government liability & donation rollover
+│       └── district.py             Output 3: District collectible & disbursement
 └── tests/
-    └── test_plan.py
+    ├── test_plan.py                45 tests for plan validation
+    └── test_engines.py             12 tests for calculation engine outputs
 ```
 
-| File          | Purpose                                                                                                                                                                         |
-| ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `models.py`   | One class per part of the input, and `ImplementationPlan` which holds everything. Our assumptions (such as the allowed tranche stages) are kept in a labelled block at the top. |
-| `loader.py`   | `load_plan(path)` reads the file, parses the JSON and builds the plan. Each kind of failure becomes a `PlanLoadError` with a readable message.                                  |
-| `__main__.py` | A shortcut to check a file from the terminal. It is not part of the logic.                                                                                                      |
-
-Run the tests:
+Run all tests:
 
 ```powershell
-python -m pytest -q
+.\fundenv\Scripts\pytest.exe
 ```
 
-The tests cover the valid sample, every rejection rule, the accepted cases (case differences, optional end date), the `covers` helper, saving and reloading a plan, and the loader errors.

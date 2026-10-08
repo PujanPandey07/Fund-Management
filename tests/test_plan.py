@@ -86,6 +86,10 @@ BAD_CASES = [
         start="2015-05-12"), "must start after the disaster dates"),
     ("misspelled optional key", lambda d: d["plan"]["affected_areas"][1].update(
         local_level=[]), "Extra inputs are not permitted"),
+    ("government liability does not sum to 100", lambda d: d.update(
+        government_liability={"federal": 50, "province": 30, "local": 10}), "must sum to 100%"),
+    ("negative liability percentage", lambda d: d.update(
+        government_liability={"federal": 110, "province": 0, "local": -10}), "greater than or equal to 0"),
 ]
 
 

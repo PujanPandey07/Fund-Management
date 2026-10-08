@@ -34,6 +34,12 @@
     ]
   },
 
+  "government_liability": {
+    "federal": 50,
+    "province": 30,
+    "local": 20
+  },
+
   "regions": ["Himal", "Pahad", "Terai"],
   "disaster_types": ["Earthquake"],
   "solution_types": ["Reconstruction", "Retrofitting"],

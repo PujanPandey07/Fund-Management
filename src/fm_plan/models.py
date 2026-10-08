@@ -205,6 +205,21 @@ def slugify(text: str) -> str:
     return re.sub(r"[^a-z0-9]+", "-", text.lower()).strip("-")
 
 
+class GovernmentLiability(StrictModel):
+    federal: Annotated[float, Field(ge=0, le=100)]
+    province: Annotated[float, Field(ge=0, le=100)]
+    local: Annotated[float, Field(ge=0, le=100)]
+
+    @model_validator(mode="after")
+    def sum_to_100(self):
+        total = self.federal + self.province + self.local
+        if round(total, 4) != 100.0:
+            raise ValueError(
+                f"government liability percentages must sum to 100%, got {total}%"
+            )
+        return self
+
+
 class ImplementationPlan(StrictModel):
     plan: PlanDetails
     government: Government
@@ -212,6 +227,9 @@ class ImplementationPlan(StrictModel):
     disaster_types: Annotated[list[NonEmptyStr], Field(min_length=1)]
     solution_types: Annotated[list[NonEmptyStr], Field(min_length=1)]
     grant_matrix: Annotated[list[GrantRow], Field(min_length=1)]
+    government_liability: GovernmentLiability = Field(
+        default_factory=lambda: GovernmentLiability(federal=50, province=30, local=20)
+    )
 
     @model_validator(mode="before")
     @classmethod
