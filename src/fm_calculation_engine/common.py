@@ -31,21 +31,34 @@ def parse(model_class, data):
 
 
 class Donation(StrictModel):
-    """A donation received by a government entity from INGO, NGO, or private/public source."""
+    """A donation received by a government entity from INGO, NGO, or private/public source.
+
+    Donations are pooled: the whole amount is available from tranche 1 and any surplus
+    rolls over to the next tranche. `received_date` is recorded for transparency (the
+    output lists donations oldest first) but does not decide which tranche a donation
+    can pay for, because the plan does not give tranches due dates.
+    """
 
     donor_name: NonEmptyStr
-    amount: Annotated[int, Field(gt=0, description="Exact donation amount in whole rupees")]
+    amount: Annotated[int, Field(
+        gt=0, description="Exact donation amount in whole rupees")]
     received_date: date | None = None
 
 
 class BeneficiaryCount(StrictModel):
-    """Beneficiary count for a specific category within a district (and optional local level)."""
+    """Beneficiary count for a specific category within a district (and optional local level).
+
+    `region` is optional. A district belongs to exactly one region in the plan, so it
+    is taken from the plan. If you do give it, it must match the plan's region for
+    that district.
+    """
 
     district: NonEmptyStr
-    region: NonEmptyStr
     disaster_type: NonEmptyStr
     solution_type: NonEmptyStr
-    count: Annotated[int, Field(ge=0, description="Number of beneficiary households")]
+    count: Annotated[int, Field(
+        ge=0, description="Number of beneficiary households")]
+    region: NonEmptyStr | None = None
     local_level: NonEmptyStr | None = None
 
 
@@ -61,47 +74,90 @@ def validate_beneficiary_counts(
     plan: ImplementationPlan,
     counts: list[BeneficiaryCount | dict],
 ) -> list[BeneficiaryCount]:
-    """Parse and validate that beneficiary counts match the plan's entities and categories."""
-    parsed_counts = [parse(BeneficiaryCount, c) for c in counts]
-    problems = []
+    """Check every count against the plan and return them with the plan's own spelling.
 
-    district_names = [d.name for d in plan.government.districts]
-    local_pairs = {(norm(l.district), norm(l.name)) for l in plan.government.local_levels}
+    A count is rejected when:
+      - its district, disaster type or solution type is not in the plan;
+      - its region does not match the region the plan gives that district;
+      - its local level does not belong to its district;
+      - its district (or local level) is not inside the plan's affected areas.
+
+    In the returned counts `region` is always filled in, taken from the plan.
+    """
+    parsed_counts = [parse(BeneficiaryCount, c) for c in counts]
+    problems: list[str] = []
+    checked: list[BeneficiaryCount] = []
+
+    districts = {norm(d.name): d for d in plan.government.districts}
 
     for idx, b in enumerate(parsed_counts):
-        matched_dist = match_name(b.district, district_names)
-        if not matched_dist:
+        district = districts.get(norm(b.district))
+        if district is None:
             problems.append(
-                f"item {idx}: district '{b.district}' is not in plan's districts {district_names}"
+                f"item {idx}: district '{b.district}' is not in plan's districts "
+                f"{[d.name for d in plan.government.districts]}"
             )
 
-        matched_reg = match_name(b.region, plan.regions)
-        if not matched_reg:
-            problems.append(
-                f"item {idx}: region '{b.region}' is not in plan's regions {plan.regions}"
-            )
-
-        matched_dis = match_name(b.disaster_type, plan.disaster_types)
-        if not matched_dis:
-            problems.append(
-                f"item {idx}: disaster_type '{b.disaster_type}' is not in plan's disaster types {plan.disaster_types}"
-            )
-
-        matched_sol = match_name(b.solution_type, plan.solution_types)
-        if not matched_sol:
-            problems.append(
-                f"item {idx}: solution_type '{b.solution_type}' is not in plan's solution types {plan.solution_types}"
-            )
-
-        if b.local_level and matched_dist:
-            if (norm(matched_dist), norm(b.local_level)) not in local_pairs:
+        if b.region is not None:
+            matched_region = match_name(b.region, plan.regions)
+            if matched_region is None:
                 problems.append(
-                    f"item {idx}: local level '{b.local_level}' does not belong to district '{matched_dist}' in this plan"
+                    f"item {idx}: region '{b.region}' is not in plan's regions {plan.regions}"
                 )
+            elif district is not None and norm(matched_region) != norm(district.region):
+                problems.append(
+                    f"item {idx}: region '{b.region}' does not match district '{district.name}', "
+                    f"which is in region '{district.region}' in this plan"
+                )
+
+        disaster = match_name(b.disaster_type, plan.disaster_types)
+        if disaster is None:
+            problems.append(
+                f"item {idx}: disaster_type '{b.disaster_type}' is not in plan's disaster types "
+                f"{plan.disaster_types}"
+            )
+
+        solution = match_name(b.solution_type, plan.solution_types)
+        if solution is None:
+            problems.append(
+                f"item {idx}: solution_type '{b.solution_type}' is not in plan's solution types "
+                f"{plan.solution_types}"
+            )
+
+        local_level = None
+        if b.local_level and district is not None:
+            local_level = match_name(
+                b.local_level,
+                [ll.name for ll in plan.government.local_levels if norm(
+                    ll.district) == norm(district.name)],
+            )
+            if local_level is None:
+                problems.append(
+                    f"item {idx}: local level '{b.local_level}' does not belong to district "
+                    f"'{district.name}' in this plan"
+                )
+
+        if district is not None and (local_level or not b.local_level):
+            if not plan.is_affected(district.name, local_level):
+                where = f"local level '{local_level}' in district '{district.name}'" if local_level else f"district '{district.name}'"
+                problems.append(
+                    f"item {idx}: {where} is not in this plan's affected areas")
+
+        if district is not None and disaster and solution and (local_level or not b.local_level):
+            checked.append(
+                BeneficiaryCount(
+                    district=district.name,
+                    region=district.region,
+                    disaster_type=disaster,
+                    solution_type=solution,
+                    count=b.count,
+                    local_level=local_level,
+                )
+            )
 
     if problems:
         raise EngineInputError(
             f"{len(problems)} problem(s) in beneficiary counts:\n"
             + "\n".join(f"  - {p}" for p in problems)
         )
-    return parsed_counts
+    return checked

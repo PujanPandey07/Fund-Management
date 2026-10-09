@@ -1,10 +1,29 @@
-# Fund Management: Plan Builder (`fm_plan`)
+# Fund Management for Disaster Reconstruction
 
-`fm_plan` is package 1 of the Fund Management system for disaster reconstruction. It reads **one JSON file** that describes a reconstruction plan, checks that everything in it is consistent, and builds one validated **Implementation Plan object**.
+Two Python packages for the core of a disaster reconstruction fund system. One describes **what the plan is**; the other works out **the money**.
 
-It does **no money calculation**. It only answers: _what is this plan?_ The calculation engine (package 2) takes the plan, plus beneficiary counts, and works out the required fund, each government's liability and what each district must collect.
+| Package               | Name                    | What it does                                                                                                                                                                 |
+| --------------------- | ----------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1. Plan builder       | `fm_plan`               | Reads one JSON file describing a reconstruction plan, checks it is consistent, and builds one validated plan object. No money calculation.                                   |
+| 2. Calculation engine | `fm_calculation_engine` | Takes the plan plus beneficiary counts and donations, and works out what each beneficiary receives, what each government owes, and what each district collects and forwards. |
+
+**Status:** trial implementation, not yet part of a production system. Decisions made and the questions still open are in [`decisions.md`](decisions.md).
+
+## Quick start
+
+From the repository root (Python 3.10 or newer):
+
+```powershell
+python -m venv fundenv
+.\fundenv\Scripts\Activate.ps1      # macOS / Linux: source fundenv/bin/activate
+pip install -e ".[dev]"
+pytest                              # run the tests
+python demo_e2e.py                  # run the whole flow on example_plan.json
+```
 
 ## Contents
+
+Sections 1 to 9 describe package 1 (`fm_plan`). Section 10 describes package 2 (`fm_calculation_engine`).
 
 1. [What the plan answers](#1-what-the-plan-answers)
 2. [Install](#2-install)
@@ -15,11 +34,14 @@ It does **no money calculation**. It only answers: _what is this plan?_ The calc
 7. [The plan object (output)](#7-the-plan-object-output)
 8. [Using it in the overall system](#8-using-it-in-the-overall-system)
 9. [Assumptions and limits](#9-assumptions-and-limits)
-10. [Project layout and tests](#10-project-layout-and-tests)
+10. [Package 2: Calculation Engine](#10-package-2-calculation-engine-fm_calculation_engine)
+11. [Project layout and tests](#11-project-layout-and-tests)
 
 ---
 
 ## 1. What the plan answers
+
+`fm_plan` reads **one JSON file** that describes a reconstruction plan, checks that everything in it is consistent, and builds one validated **Implementation Plan object**. It does **no money calculation**. It only answers: _what is this plan?_ The calculation engine (section 10) takes the plan, plus beneficiary counts, and works out the money.
 
 | Question                                                            | Part of the file                              |
 | ------------------------------------------------------------------- | --------------------------------------------- |
@@ -98,14 +120,15 @@ All values in the sample file (`example_plan.json`) are made up. Only the shape 
 
 ### 4.1 Top level
 
-| Key              | What it holds                                                            |
-| ---------------- | ------------------------------------------------------------------------ |
-| `plan`           | Plan details and affected areas                                          |
-| `government`     | Federal, provinces, districts, local levels, and who belongs to whom     |
-| `regions`        | List of region names                                                     |
-| `disaster_types` | List of disaster type names                                              |
-| `solution_types` | List of solution type names                                              |
-| `grant_matrix`   | One row per region × disaster type × solution type, with tranche amounts |
+| Key                    | What it holds                                                                          |
+| ---------------------- | -------------------------------------------------------------------------------------- |
+| `plan`                 | Plan details and affected areas                                                        |
+| `government`           | Federal, provinces, districts, local levels, and who belongs to whom                   |
+| `regions`              | List of region names                                                                   |
+| `disaster_types`       | List of disaster type names                                                            |
+| `solution_types`       | List of solution type names                                                            |
+| `grant_matrix`         | One row per region × disaster type × solution type, with tranche amounts               |
+| `government_liability` | How the cost is shared: federal, province and local percentages. Optional, but see 4.7 |
 
 ### 4.2 `plan`
 
@@ -191,7 +214,25 @@ Example row: Pahad, Earthquake, Reconstruction is 15,000 + 15,000 (shelter) and 
 }
 ```
 
-### 4.7 General rules for the whole file
+### 4.7 `government_liability`
+
+How the money for every grant is shared between the three levels of government. The engine uses it for every tranche.
+
+| Field      | Type   | Required | Meaning                                | Rules    |
+| ---------- | ------ | -------- | -------------------------------------- | -------- |
+| `federal`  | number | Yes      | Federal government's share, in percent | 0 to 100 |
+| `province` | number | Yes      | Province government's share            | 0 to 100 |
+| `local`    | number | Yes      | Local government's share               | 0 to 100 |
+
+The three must add up to exactly 100. Decimals such as `33.33` are allowed.
+
+```
+"government_liability": { "federal": 50, "province": 30, "local": 20 }
+```
+
+**If the whole `government_liability` section is left out**, the default of 50 / 30 / 20 is used, and loading the plan raises a `DefaultLiabilityWarning` (from `fm_plan`) so it is never a silent choice. A plan saved with `model_dump_json()` always contains the section, so reloading it does not warn. Put the section in the file to set it on purpose.
+
+### 4.8 General rules for the whole file
 
 | Rule                            | Meaning                                                                                                       |
 | ------------------------------- | ------------------------------------------------------------------------------------------------------------- |
@@ -218,6 +259,8 @@ Example row: Pahad, Earthquake, Reconstruction is 15,000 + 15,000 (shelter) and 
 | Grant matrix   | No row is repeated                                                                                                           |
 | Grant matrix   | **Every region × disaster × solution combination has a row**                                                                 |
 | Tranches       | At least one tranche per row; stage is `shelter` or `main`; shelter tranches come first; amount is a whole number above zero |
+| Liability      | Each of `federal`, `province`, `local` is between 0 and 100, and the three add up to 100                                     |
+| Liability      | If `government_liability` is missing, the default 50 / 30 / 20 is used and a `DefaultLiabilityWarning` is raised             |
 
 ## 6. Error messages
 
@@ -291,18 +334,19 @@ broken.json is not valid JSON (line 37, column 13): Expecting ':' delimiter
 
 ### 8.2 What the engine takes from the plan
 
-| The engine needs                                   | Where to find it in the plan                                                       |
-| -------------------------------------------------- | ---------------------------------------------------------------------------------- |
-| Is a beneficiary's address covered by the plan?    | `plan.covers(district, local_level, ward)`                                         |
-| A beneficiary's region (Himal, Pahad, Terai)       | The `region` of their district in `government.districts`                           |
-| The tranches for that beneficiary                  | The `grant_matrix` row for their region, the disaster type and their solution type |
-| Number of tranches, and amount of each             | `len(row.tranches)` and `row.tranches[i].amount`                                   |
-| Total grant                                        | `row.total`                                                                        |
-| Which province pays into which district            | The `province` on each district                                                    |
-| Which local levels a district hands money to       | The local levels whose `district` matches                                          |
-| Which stage a tranche belongs to (shelter or main) | `row.tranches[i].stage`                                                            |
+| The engine needs                                   | Where to find it in the plan                                                                                   |
+| -------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| Is a beneficiary's address covered by the plan?    | `plan.covers(district, local_level, ward)`, or `plan.is_affected(district, local_level)` when there is no ward |
+| How the cost is shared between governments         | `government_liability.federal`, `.province`, `.local`                                                          |
+| A beneficiary's region (Himal, Pahad, Terai)       | The `region` of their district in `government.districts`                                                       |
+| The tranches for that beneficiary                  | The `grant_matrix` row for their region, the disaster type and their solution type                             |
+| Number of tranches, and amount of each             | `len(row.tranches)` and `row.tranches[i].amount`                                                               |
+| Total grant                                        | `row.total`                                                                                                    |
+| Which province pays into which district            | The `province` on each district                                                                                |
+| Which local levels a district hands money to       | The local levels whose `district` matches                                                                      |
+| Which stage a tranche belongs to (shelter or main) | `row.tranches[i].stage`                                                                                        |
 
-The plan object holds the data. Convenience lookups for these (for example "give me the tranches for this region, disaster and solution") are not part of this version. The engine can read the lists directly, or small helpers can be added to the plan object later.
+The plan object holds the data, and the engine in section 10 reads exactly these things from it. The plan has no helper such as "give me the tranches for this region, disaster and solution"; the engine looks the grant matrix row up itself.
 
 ### 8.3 Ways to connect it
 
@@ -345,14 +389,69 @@ Revising a plan means creating a new file with a higher `plan_version`. The new 
 | Names use English letters for the plan ID                      | A name written only in Devanagari would give an empty part in the ID                                                                                                                                |
 | The package checks consistency, not truth                      | If the file says a district belongs to the wrong province but the province exists, it is accepted. A trusted master list of places, such as the form's dropdowns, is what guarantees correct facts. |
 | The government list and the affected areas are separate inputs | The package checks that the affected areas exist in the government list. It does not check that the government list contains every local level of an affected district.                             |
-| `covers` with a ward-limited local level and no ward           | Returns `False`                                                                                                                                                                                     |
+| `covers` with a ward-limited local level and no ward           | Returns `False`. `is_affected` ignores wards and returns `True`, because the local level is partly affected                                                                                         |
 
 ## 10. Package 2: Calculation Engine (`fm_calculation_engine`)
 
-The calculation engine consumes an `ImplementationPlan` alongside beneficiary counts and donations to produce the three primary system outputs.
+The engine takes a validated `ImplementationPlan` (package 1), beneficiary counts and, for governments, donations. It produces three outputs:
 
-### 10.1 Output 1: Beneficiary (`receivable_amounts`)
-Calculates the receivable tranche amounts and total grant for an individual beneficiary profile based on their geographical region, disaster type, and solution type.
+| Output | Function                         | Answers                                                                       |
+| ------ | -------------------------------- | ----------------------------------------------------------------------------- |
+| 1      | `receivable_amounts`             | What does one beneficiary receive in each tranche?                            |
+| 2      | `calculate_government_liability` | What does one government (federal, province or local) owe, after donations?   |
+| 3      | `calculate_district_fund`        | What must one district collect, and what does it forward to each local level? |
+
+Outputs 2 and 3 are built from **one shared schedule per district** (`core.py`), so they always agree: a district's total is exactly its federal share plus its province share plus its local share, and the governments' liabilities add up to what the districts need.
+
+All the examples below use the plan from `example_plan.json`:
+
+```python
+from fm_plan import load_plan
+plan = load_plan("example_plan.json")
+```
+
+### 10.1 Beneficiary counts (input to outputs 2 and 3)
+
+A list of groups of households. Each group is one item:
+
+| Field           | Type         | Required | Meaning                       | Rules                                                                                                                                                           |
+| --------------- | ------------ | -------- | ----------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `district`      | text         | Yes      | District of the households    | Must be in the plan's districts and inside the plan's affected areas                                                                                            |
+| `local_level`   | text         | No       | Local level of the households | Must belong to that district and be inside the affected areas (wards are ignored). If left out, the money is shared equally between the district's local levels |
+| `disaster_type` | text         | Yes      | Disaster type                 | Must be in the plan                                                                                                                                             |
+| `solution_type` | text         | Yes      | Solution type                 | Must be in the plan                                                                                                                                             |
+| `count`         | whole number | Yes      | Number of households          | 0 or more                                                                                                                                                       |
+| `region`        | text         | No       | Himal, Pahad or Terai         | Taken from the plan, because a district has exactly one region. If you give it, it must match the plan's region for that district                               |
+
+The same group may appear more than once; the counts are added together. Names ignore capital letters and are returned in the plan's spelling.
+
+```python
+beneficiary_counts = [
+    {"district": "Gorkha", "local_level": "Gorkha Municipality",
+     "disaster_type": "Earthquake", "solution_type": "Reconstruction", "count": 10},
+    {"district": "Sindhupalchok", "local_level": "Melamchi Municipality",
+     "disaster_type": "Earthquake", "solution_type": "Reconstruction", "count": 20},
+    {"district": "Sindhupalchok", "local_level": "Helambu Rural Municipality",
+     "disaster_type": "Earthquake", "solution_type": "Retrofitting", "count": 5},
+]
+```
+
+### 10.2 Output 1: Beneficiary (`receivable_amounts`)
+
+Gives the receivable amount in each tranche, and the total grant, for one grid cell of the grant matrix.
+
+| Input field     | Required | Meaning                              |
+| --------------- | -------- | ------------------------------------ |
+| `plan_id`       | Yes      | Must equal `plan.plan_id`            |
+| `region`        | Yes      | Must be in the plan's regions        |
+| `disaster_type` | Yes      | Must be in the plan's disaster types |
+| `solution_type` | Yes      | Must be in the plan's solution types |
+
+| Output field                                          | Meaning                                             |
+| ----------------------------------------------------- | --------------------------------------------------- |
+| `plan_id`, `region`, `disaster_type`, `solution_type` | The input, in the plan's spelling                   |
+| `tranches`                                            | List of `tranche` (1, 2, ...), `stage` and `amount` |
+| `total`                                               | Sum of the tranche amounts                          |
 
 ```python
 from fm_calculation_engine import receivable_amounts
@@ -361,7 +460,7 @@ profile = {
     "plan_id": plan.plan_id,
     "region": "Pahad",
     "disaster_type": "Earthquake",
-    "solution_type": "Reconstruction"
+    "solution_type": "Reconstruction",
 }
 result = receivable_amounts(plan, profile)
 print(result.total)         # 300000
@@ -369,33 +468,43 @@ for t in result.tranches:
     print(f"Tranche {t.tranche} ({t.stage}): Rs. {t.amount}")
 ```
 
-### 10.2 Output 2: Government Liability (`calculate_government_liability`)
-Calculates the liability for Federal, Provincial, or Local government across tranches:
-- **Boundary rules**: Federal is liable for all affected districts; Province is liable only for districts within its province boundary; Local government is liable only for its own district/local level.
-- **Donation offset & rollover**: Donations received from INGO/NGO/donors offset the entity's cash liability. Surplus donations automatically roll over across successive tranches.
-- **District breakdown**: Details the exact gross and net amounts payable to each district per tranche.
-- **Beneficiary summary**: Reports total beneficiaries broken down by region, disaster type, and solution type.
+### 10.3 Output 2: Government liability (`calculate_government_liability`)
+
+Gives what one government owes in each tranche, how donations reduce it, and which districts it pays into.
+
+| Input field       | Required | Meaning                                                                                                       |
+| ----------------- | -------- | ------------------------------------------------------------------------------------------------------------- |
+| `plan_id`         | Yes      | Must equal `plan.plan_id`                                                                                     |
+| `gov_entity_name` | Yes      | The federal government, a province or a local level, as named in the plan                                     |
+| `gov_type`        | No       | `federal`, `province` or `local`. Found automatically; if given it must match                                 |
+| `district`        | No       | Only for a local government whose name is used in more than one district. Not allowed for federal or province |
+| `donations`       | No       | List of `donor_name`, `amount` (whole rupees above zero) and `received_date` (optional)                       |
+
+Who owes what:
+
+- **Federal** owes its share for every district that has beneficiaries.
+- **Province** owes its share only for districts inside that province.
+- **Local government** owes its share of its own district's money, in proportion to what each local level of that district must pay out.
+
+| Output field                                                                                       | Meaning                                                                                                                                                                |
+| -------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `gov_type`, `liability_percentage`                                                                 | The kind of government and its percentage from `government_liability`                                                                                                  |
+| `total_beneficiaries`, `beneficiary_summary`                                                       | Households under this government, grouped by disaster, region and solution                                                                                             |
+| `unassigned_beneficiaries`                                                                         | Local governments only: households in the district that named no local level (see section 10.6)                                                                        |
+| `donations`, `total_donations_received`                                                            | The donations, oldest first (undated last), and their sum                                                                                                              |
+| `tranches[]`                                                                                       | Per tranche: `gross_liability`, `donation_applied`, `net_payable`, `remaining_donation`, and `districts[]` with `gross_liability`, `donation_offset` and `net_payable` |
+| `total_gross_liability`, `total_donation_applied`, `total_net_payable`, `final_remaining_donation` | Totals over all tranches                                                                                                                                               |
 
 ```python
 from fm_calculation_engine import calculate_government_liability
 
 gov_profile = {
     "plan_id": plan.plan_id,
-    "gov_entity_name": "Government of Nepal",   # or Province or Local Gov name
+    "gov_entity_name": "Government of Nepal",   # or a province, or a local level
     "donations": [
         {"donor_name": "Red Cross", "amount": 100000, "received_date": "2015-10-01"}
-    ]
+    ],
 }
-beneficiary_counts = [
-    {
-        "district": "Gorkha",
-        "local_level": "Gorkha Municipality",
-        "region": "Pahad",
-        "disaster_type": "Earthquake",
-        "solution_type": "Reconstruction",
-        "count": 10
-    }
-]
 
 out = calculate_government_liability(plan, gov_profile, beneficiary_counts)
 print(f"Gov Type: {out.gov_type}, Liability %: {out.liability_percentage}%")
@@ -404,18 +513,28 @@ for t in out.tranches:
     print(f"Tranche {t.tranche}: Gross={t.gross_liability}, Donation Used={t.donation_applied}, Net={t.net_payable}")
 ```
 
-### 10.3 Output 3: District (`calculate_district_fund`)
-Calculates the collectible funds and local government forwarding responsibilities for a specific district:
-- **Collectibles**: Sums required tranche funds and splits collections by Federal %, Province %, and Local % liability.
-- **Local Government Disbursements**: Breaks down funds to be forwarded to each local government under that district based on beneficiary counts and tranche amounts.
+With the sample plan and counts, tranche 1 prints `Gross=350000, Donation Used=100000, Net=250000`.
+
+### 10.4 Output 3: District (`calculate_district_fund`)
+
+Gives what one district must collect from each level of government, and what it forwards to each of its local levels.
+
+| Input field     | Required | Meaning                         |
+| --------------- | -------- | ------------------------------- |
+| `plan_id`       | Yes      | Must equal `plan.plan_id`       |
+| `district_name` | Yes      | Must be in the plan's districts |
+
+| Output field                               | Meaning                                                                                                                            |
+| ------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------- |
+| `district_name`, `province_name`, `region` | Which district, and its province and region from the plan                                                                          |
+| `total_beneficiaries`                      | Households in the district                                                                                                         |
+| `tranches[]`                               | Per tranche: `total_amount`, `collectible` (`federal`, `province`, `local`, `total`) and `disbursements[]` (`local_gov`, `amount`) |
+| `grand_total`                              | Total over all tranches                                                                                                            |
 
 ```python
 from fm_calculation_engine import calculate_district_fund
 
-dist_profile = {
-    "plan_id": plan.plan_id,
-    "district_name": "Sindhupalchok"
-}
+dist_profile = {"plan_id": plan.plan_id, "district_name": "Sindhupalchok"}
 
 district_out = calculate_district_fund(plan, dist_profile, beneficiary_counts)
 for t in district_out.tranches:
@@ -425,33 +544,88 @@ for t in district_out.tranches:
         print(f"  Disburse to {d.local_gov}: Rs. {d.amount}")
 ```
 
+With the sample plan and counts, tranche 1 is Rs. 550000: federal 275000, province 165000, local 110000, forwarded as Melamchi 300000 and Helambu 250000.
+
+### 10.5 How the numbers are worked out
+
+1. For each tranche round, each household group needs `count × the grant amount for that round`. The grant comes from the plan's grant matrix row for the district's region, the disaster type and the solution type.
+2. A district's total for the round is split between federal, province and local in proportion to `government_liability`.
+3. The district's local share is split between its local levels in proportion to what each one must pay out.
+4. A government's liability is its share from steps 2 and 3. Donations are then taken off, from tranche 1 onward; any surplus rolls over to the next tranche.
+
+Every split uses the **largest remainder method** on whole rupees. Each part gets its whole rupees, and the few left over go to the parts with the largest fractions (ties go to the earlier part, so federal first, then province, then local). The parts always add up to the total, and the result is the same every time. For example, splitting Rs. 10 as 33.33 / 33.33 / 33.34 gives 3 / 3 / 4.
+
+### 10.6 Errors the engine reports
+
+All problems in the counts are reported together:
+
+```
+2 problem(s) in beneficiary counts:
+  - item 0: region 'Terai' does not match district 'Gorkha', which is in region 'Pahad' in this plan
+  - item 1: local level 'Melamchi Municipality' does not belong to district 'Gorkha' in this plan
+```
+
+Other messages:
+
+```
+plan_id 'x' does not match this plan ('gorkha-earthquake-2015-housing-reconstruction-v1')
+Government entity 'Unknown Council' was not found in the plan's government structure.
+item 2: district 'Dhading' is not in this plan's affected areas
+'Central Municipality' is a local government in more than one district ['Gorkha', 'Sindhupalchok']. Say which one with the 'district' field.
+District 'Dhading' has beneficiaries but no local levels in this plan's government section, so its money cannot be forwarded. Add its local levels.
+```
+
+### 10.7 Engine assumptions and limits
+
+| Assumption or limit                              | Detail                                                                                                                                                                                                          |
+| ------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Tranche rounds are the same for every grant      | Round N is tranche N of every grant. A grant with fewer tranches pays Rs. 0 in the later rounds. One round's `stages` list can therefore mix `shelter` and `main`                                               |
+| Counts are fixed for the whole plan              | There is no change of counts between tranches                                                                                                                                                                   |
+| Donations are pooled from tranche 1              | `received_date` is recorded and sorts the list, but does not hold a donation back, because the plan gives tranches no dates                                                                                     |
+| One percentage split for all tranches            | The same federal / province / local percentages apply to every tranche, shelter and main                                                                                                                        |
+| Wards are not checked in counts                  | A local level listed with only some wards counts as affected, because counts have no ward                                                                                                                       |
+| Households with no local level                   | Their money is shared equally between the district's local levels (odd rupees go to the first ones in the plan). For a local government they appear as `unassigned_beneficiaries`, not in `total_beneficiaries` |
+| A district with beneficiaries needs local levels | Otherwise its money could not be forwarded, and the engine stops with an error                                                                                                                                  |
+| Whole rupees                                     | All amounts are whole numbers; splits use the largest remainder method                                                                                                                                          |
+
+The business rules above that still need the senior's confirmation are listed in `decisions.md`, section 4.
+
 ## 11. Project layout and tests
 
 ```
 Fund-Management/
 ├── README.md
+├── decisions.md                    Decisions made, and open questions for the senior
+├── demo_e2e.py                     Runs the whole flow on example_plan.json and prints it
 ├── pyproject.toml
-├── example_plan.json               Sample input with government liability %
+├── example_plan.json               Sample input, including government_liability
 ├── src/
 │   ├── fm_plan/                    Package 1: Plan models, loader, validation
 │   │   ├── __init__.py
 │   │   ├── __main__.py
 │   │   ├── loader.py
 │   │   └── models.py
-│   └── fm_calculation_engine/      Package 2: Core calculation engine
+│   └── fm_calculation_engine/      Package 2: Calculation engine
 │       ├── __init__.py
-│       ├── common.py               Shared models (Donation, BeneficiaryCount, parse)
+│       ├── common.py               Shared models (Donation, BeneficiaryCount), validation, parse
+│       ├── core.py                 Shared schedule per district and the exact-split rule
 │       ├── beneficiary.py          Output 1: Beneficiary receivable amounts
 │       ├── government.py           Output 2: Government liability & donation rollover
 │       └── district.py             Output 3: District collectible & disbursement
 └── tests/
-    ├── test_plan.py                45 tests for plan validation
-    └── test_engines.py             12 tests for calculation engine outputs
+    ├── test_plan.py                Plan validation
+    ├── test_engines.py             The three outputs on the sample plan
+    └── test_engine_consistency.py  Counts checked against the plan, and the money adding up
 ```
 
-Run all tests:
+Run all tests (with the virtual environment active):
 
-```powershell
-.\fundenv\Scripts\pytest.exe
+```
+pytest
 ```
 
+Run the demonstration:
+
+```
+python demo_e2e.py
+```

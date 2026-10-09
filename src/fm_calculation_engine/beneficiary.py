@@ -1,7 +1,7 @@
 from fm_plan import ImplementationPlan
 from fm_plan.models import NonEmptyStr, StrictModel, norm
 
-from fm_calculation_engine.common import EngineInputError, parse
+from fm_calculation_engine.common import EngineInputError, match_name, parse
 
 
 class BeneficiaryProfile(StrictModel):
@@ -30,14 +30,6 @@ class ReceivableAmounts(StrictModel):
     total: int
 
 
-def _match(value: str, allowed: list[str]):
-    """The name in `allowed` that equals `value`, ignoring capital letters, or None."""
-    for name in allowed:
-        if norm(name) == norm(value):
-            return name
-    return None
-
-
 def receivable_amounts(plan: ImplementationPlan, profile) -> ReceivableAmounts:
     """Receivable amount for each tranche for one beneficiary."""
     p = parse(BeneficiaryProfile, profile)
@@ -46,16 +38,16 @@ def receivable_amounts(plan: ImplementationPlan, profile) -> ReceivableAmounts:
     if norm(p.plan_id) != norm(plan.plan_id):
         problems.append(
             f"plan_id '{p.plan_id}' does not match this plan ('{plan.plan_id}')")
-    region = _match(p.region, plan.regions)
+    region = match_name(p.region, plan.regions)
     if region is None:
         problems.append(
             f"region '{p.region}' is not in this plan's regions {plan.regions}")
-    disaster = _match(p.disaster_type, plan.disaster_types)
+    disaster = match_name(p.disaster_type, plan.disaster_types)
     if disaster is None:
         problems.append(
             f"disaster_type '{p.disaster_type}' is not in this plan's disaster types {plan.disaster_types}"
         )
-    solution = _match(p.solution_type, plan.solution_types)
+    solution = match_name(p.solution_type, plan.solution_types)
     if solution is None:
         problems.append(
             f"solution_type '{p.solution_type}' is not in this plan's solution types {plan.solution_types}"

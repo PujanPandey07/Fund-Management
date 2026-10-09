@@ -1,4 +1,5 @@
 from fm_plan.loader import PlanLoadError, load_plan
-from fm_plan.models import ImplementationPlan
+from fm_plan.models import DefaultLiabilityWarning, ImplementationPlan
 
-__all__ = ["ImplementationPlan", "PlanLoadError", "load_plan"]
+__all__ = ["DefaultLiabilityWarning",
+           "ImplementationPlan", "PlanLoadError", "load_plan"]

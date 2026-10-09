@@ -1,4 +1,5 @@
 import re
+import warnings
 from datetime import date
 from itertools import product
 from typing import Annotated
@@ -28,6 +29,10 @@ class StrictModel(BaseModel):
     """Base for every template: a key that is not part of the template is an error."""
 
     model_config = ConfigDict(extra="forbid")
+
+
+class DefaultLiabilityWarning(UserWarning):
+    """The plan file has no government_liability, so the 50/30/20 default is used."""
 
 
 def norm(text: str) -> str:
@@ -228,7 +233,8 @@ class ImplementationPlan(StrictModel):
     solution_types: Annotated[list[NonEmptyStr], Field(min_length=1)]
     grant_matrix: Annotated[list[GrantRow], Field(min_length=1)]
     government_liability: GovernmentLiability = Field(
-        default_factory=lambda: GovernmentLiability(federal=50, province=30, local=20)
+        default_factory=lambda: GovernmentLiability(
+            federal=50, province=30, local=20)
     )
 
     @model_validator(mode="before")
@@ -238,6 +244,24 @@ class ImplementationPlan(StrictModel):
         if isinstance(data, dict) and "plan_id" in data:
             data = {key: value for key, value in data.items() if key !=
                     "plan_id"}
+        return data
+
+    @model_validator(mode="before")
+    @classmethod
+    def warn_if_liability_defaulted(cls, data):
+        """The liability split changes every money result, so a silent default is not safe.
+
+        The default (50/30/20) is still used, but the person loading the plan is told.
+        A plan saved with model_dump_json() always contains the field, so it never warns.
+        """
+        if isinstance(data, dict) and "government_liability" not in data:
+            warnings.warn(
+                "government_liability is missing from the plan, so the default split "
+                "federal 50% / province 30% / local 20% is being used. "
+                "Add government_liability to the plan file to set it explicitly.",
+                DefaultLiabilityWarning,
+                stacklevel=2,
+            )
         return data
 
     @computed_field
@@ -323,6 +347,22 @@ class ImplementationPlan(StrictModel):
         if problems:
             raise ValueError("; ".join(problems))
         return self
+
+    def is_affected(self, district: str, local_level: str | None = None) -> bool:
+        """Is any part of this district (or local level) inside the plan's affected areas?
+
+        Unlike covers(), wards are ignored: a local level listed with only some wards
+        still counts as affected. Use it when the address has no ward (for example
+        beneficiary counts grouped by local level).
+        """
+        for area in self.plan.affected_areas:
+            if norm(area.district) != norm(district):
+                continue
+            if local_level is None or not area.local_levels:
+                return True
+            if any(norm(ll.name) == norm(local_level) for ll in area.local_levels):
+                return True
+        return False
 
     def covers(self, district: str, local_level: str | None = None, ward: int | None = None) -> bool:
         """Is this address inside the plan's affected areas?"""
