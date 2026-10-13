@@ -1,0 +1,8 @@
+# Tools for developing and releasing the two packages.
+# Install with:  pip install -r requirements-dev.txt
+# (equivalent to:  pip install -e ".[dev]")
+
+pydantic>=2     # runtime dependency of both packages
+pytest>=8       # run the test suite
+build>=1.2      # build wheels and source distributions (python -m build)
+twine>=5        # check and upload distributions to PyPI / TestPyPI

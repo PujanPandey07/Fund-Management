@@ -5,7 +5,7 @@
 #   .\publish_to_pypi.ps1 -Repository testpypi  # build, then upload to TestPyPI
 #   .\publish_to_pypi.ps1 -Repository pypi      # build, then upload to real PyPI
 #
-# Needs:  pip install build twine      (both are in the "dev" extra of the root pyproject.toml)
+# Needs:  pip install -r requirements-dev.txt   (installs build and twine)
 # The plan package is always uploaded first, because the engine depends on it.
 
 param(
@@ -15,6 +15,13 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
+
+foreach ($module in @("build", "twine")) {
+    python -c "import $module" 2>$null
+    if ($LASTEXITCODE -ne 0) {
+        throw "'$module' is not installed. Run: pip install -r requirements-dev.txt"
+    }
+}
 
 $Packages = @(
     @{ Name = "disaster-fund-plan";              Path = "packages\fm-plan" },

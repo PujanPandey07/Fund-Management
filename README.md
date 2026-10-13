@@ -25,6 +25,25 @@ pytest                              # run the tests (88 passing)
 python demo_e2e.py                  # run the whole flow on example_plan.json
 ```
 
+### Development tools
+
+Besides `pydantic` (needed by both packages), you need three tools for working on the project:
+
+| Tool | What it is for | Used by |
+| --- | --- | --- |
+| `pytest` | Runs the test suite (`pytest`) | everyday development |
+| `build` | Builds the wheel and source distribution (`python -m build`) | publishing |
+| `twine` | Checks and uploads the built files to PyPI / TestPyPI (`twine check`, `twine upload`) | publishing |
+
+Install them all with either command (they do the same thing):
+
+```bash
+pip install -r requirements-dev.txt
+pip install -e ".[dev]"
+```
+
+`pytest` runs without installing the two packages, because `pyproject.toml` already puts their `src` folders on the path. `publish_to_pypi.ps1` needs `build` and `twine` and will stop with an error if they are missing.
+
 ## Contents
 
 Sections 1 to 9 describe package 1 (`fm_plan`, PyPI: `disaster-fund-plan`). Section 10 describes package 2 (`fm_calculation_engine`, PyPI: `disaster-fund-management-engine`).

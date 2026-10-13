@@ -13,9 +13,9 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = [
-    "pytest",
-    "build",
-    "twine",
+    "pytest>=8",
+    "build>=1.2",
+    "twine>=5",
 ]
 
 [tool.pytest.ini_options]
