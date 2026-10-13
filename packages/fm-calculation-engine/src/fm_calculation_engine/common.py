@@ -48,6 +48,7 @@ class Donation(StrictModel):
 class BeneficiaryCount(StrictModel):
     """Beneficiary count for a specific category within a district (and optional local level).
 
+    `district` and `local_level` accept either official names or codes.
     `region` is optional. A district belongs to exactly one region in the plan, so it
     is taken from the plan. If you do give it, it must match the plan's region for
     that district.
@@ -60,6 +61,8 @@ class BeneficiaryCount(StrictModel):
         ge=0, description="Number of beneficiary households")]
     region: NonEmptyStr | None = None
     local_level: NonEmptyStr | None = None
+    district_code: str | None = None
+    local_level_code: str | None = None
 
 
 def match_name(value: str, allowed: list[str]) -> str | None:
@@ -74,8 +77,9 @@ def validate_beneficiary_counts(
     plan: ImplementationPlan,
     counts: list[BeneficiaryCount | dict],
 ) -> list[BeneficiaryCount]:
-    """Check every count against the plan and return them with the plan's own spelling.
+    """Check every count against the plan and return them with the plan's own spelling and codes.
 
+    Accepts district and local level by name or code.
     A count is rejected when:
       - its district, disaster type or solution type is not in the plan;
       - its region does not match the region the plan gives that district;
@@ -88,10 +92,8 @@ def validate_beneficiary_counts(
     problems: list[str] = []
     checked: list[BeneficiaryCount] = []
 
-    districts = {norm(d.name): d for d in plan.government.districts}
-
     for idx, b in enumerate(parsed_counts):
-        district = districts.get(norm(b.district))
+        district = plan.government.find_district(b.district)
         if district is None:
             problems.append(
                 f"item {idx}: district '{b.district}' is not in plan's districts "
@@ -124,34 +126,35 @@ def validate_beneficiary_counts(
                 f"{plan.solution_types}"
             )
 
-        local_level = None
+        local_level_obj = None
         if b.local_level and district is not None:
-            local_level = match_name(
-                b.local_level,
-                [ll.name for ll in plan.government.local_levels if norm(
-                    ll.district) == norm(district.name)],
-            )
-            if local_level is None:
+            matching_lls = plan.government.find_local_level(b.local_level, district.name)
+            if not matching_lls:
                 problems.append(
                     f"item {idx}: local level '{b.local_level}' does not belong to district "
                     f"'{district.name}' in this plan"
                 )
+            else:
+                local_level_obj = matching_lls[0]
 
-        if district is not None and (local_level or not b.local_level):
-            if not plan.is_affected(district.name, local_level):
-                where = f"local level '{local_level}' in district '{district.name}'" if local_level else f"district '{district.name}'"
+        local_level_name = local_level_obj.name if local_level_obj else None
+        if district is not None and (local_level_name or not b.local_level):
+            if not plan.is_affected(district.name, local_level_name):
+                where = f"local level '{b.local_level}' in district '{district.name}'" if b.local_level else f"district '{district.name}'"
                 problems.append(
                     f"item {idx}: {where} is not in this plan's affected areas")
 
-        if district is not None and disaster and solution and (local_level or not b.local_level):
+        if district is not None and disaster and solution and (local_level_name or not b.local_level):
             checked.append(
                 BeneficiaryCount(
                     district=district.name,
+                    district_code=district.code,
                     region=district.region,
                     disaster_type=disaster,
                     solution_type=solution,
                     count=b.count,
-                    local_level=local_level,
+                    local_level=local_level_name,
+                    local_level_code=local_level_obj.code if local_level_obj else None,
                 )
             )
 

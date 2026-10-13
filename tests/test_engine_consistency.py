@@ -354,3 +354,78 @@ def test_is_affected_ignores_wards():
     assert not plan.covers("Sindhupalchok", "Melamchi Municipality")
     assert not plan.is_affected("Nowhere")
     assert not plan.is_affected("Sindhupalchok", "Gorkha Municipality")
+
+
+# ------------------------------------------------------------------------------
+# Issue 6: Administrative codes for Government bodies
+# ------------------------------------------------------------------------------
+
+
+def test_administrative_codes_linking_and_lookups():
+    # Plan where districts link to provinces via province code, and local levels link via district code
+    def use_code_links(data):
+        data["government"]["districts"][0]["province"] = "P4"  # Gandaki
+        data["government"]["districts"][1]["province"] = "P3"  # Bagmati
+        data["government"]["local_levels"][0]["district"] = "36"  # Gorkha
+        data["government"]["local_levels"][1]["district"] = "23"  # Sindhupalchok
+        data["government"]["local_levels"][2]["district"] = "23"
+        data["plan"]["affected_areas"][0]["district"] = "36"
+        data["plan"]["affected_areas"][1]["district"] = "23"
+        data["plan"]["affected_areas"][1]["local_levels"][0]["name"] = "23001"
+
+    plan = make_plan(use_code_links)
+    assert plan.is_affected("36")
+    assert plan.is_affected("Gorkha")
+    assert plan.is_affected("23", "23001")
+    assert plan.is_affected("Sindhupalchok", "Melamchi Municipality")
+
+    # Counts supplied with codes
+    counts = [
+        count("36", "36001", "Reconstruction", 10),
+        count("23", "23001", "Reconstruction", 20),
+    ]
+
+    # District query using code "23"
+    d_out = district(plan, "23", counts)
+    assert d_out.district_name == "Sindhupalchok"
+    assert d_out.district_code == "23"
+    assert d_out.province_name == "Bagmati Province"
+    assert d_out.province_code == "P3"
+    assert d_out.tranches[0].disbursements[0].local_gov == "Melamchi Municipality"
+    assert d_out.tranches[0].disbursements[0].local_gov_code == "23001"
+
+    # Government query using province code "P3"
+    p_out = gov(plan, "P3", counts)
+    assert p_out.gov_entity_name == "Bagmati Province"
+    assert p_out.gov_entity_code == "P3"
+    assert p_out.gov_type == "province"
+    assert p_out.total_beneficiaries == 20
+    assert p_out.tranches[0].districts[0].district == "Sindhupalchok"
+    assert p_out.tranches[0].districts[0].district_code == "23"
+
+    # Government query using local level code "36001"
+    l_out = gov(plan, "36001", counts)
+    assert l_out.gov_entity_name == "Gorkha Municipality"
+    assert l_out.gov_entity_code == "36001"
+    assert l_out.gov_type == "local"
+    assert l_out.total_beneficiaries == 10
+
+
+def test_duplicate_administrative_codes_rejected():
+    def dup_district_code(data):
+        data["government"]["districts"][1]["code"] = "36"  # same as Gorkha
+
+    with pytest.raises(Exception, match="duplicate district code"):
+        make_plan(dup_district_code)
+
+    def dup_prov_code(data):
+        data["government"]["provinces"][1]["code"] = "P3"  # same as Bagmati
+
+    with pytest.raises(Exception, match="duplicate province code"):
+        make_plan(dup_prov_code)
+
+    def dup_local_code(data):
+        data["government"]["local_levels"][1]["code"] = "36001"  # same as Gorkha Mun
+
+    with pytest.raises(Exception, match="duplicate local level code"):
+        make_plan(dup_local_code)

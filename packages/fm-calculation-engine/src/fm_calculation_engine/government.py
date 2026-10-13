@@ -7,7 +7,6 @@ from fm_calculation_engine.common import (
     BeneficiaryCount,
     Donation,
     EngineInputError,
-    match_name,
     parse,
     validate_beneficiary_counts,
 )
@@ -37,6 +36,7 @@ class GovDistrictPayment(StrictModel):
     gross_liability: int
     donation_offset: int
     net_payable: int
+    district_code: str | None = None
 
 
 class GovTrancheLiability(StrictModel):
@@ -80,6 +80,7 @@ class GovernmentLiabilityOutput(StrictModel):
     total_donation_applied: int
     total_net_payable: int
     final_remaining_donation: int
+    gov_entity_code: str | None = None
 
 
 def _resolve_entity(
@@ -88,39 +89,53 @@ def _resolve_entity(
     requested_type: str | None = None,
     district: str | None = None,
 ):
-    """Find which government this is. Returns (type, canonical name, its district names)."""
-    federal_name = plan.government.federal.name
-    province_names = [p.name for p in plan.government.provinces]
+    """Find which government this is (by name or code). Returns (type, canonical name, code, its district names)."""
+    federal = plan.government.federal
+    canonical_code = None
 
-    if norm(entity_name) == norm(federal_name):
+    if norm(entity_name) == norm(federal.name) or (federal.code and norm(entity_name) == norm(federal.code)):
         entity_type = "federal"
-        canonical_name = federal_name
+        canonical_name = federal.name
+        canonical_code = federal.code
         managed_districts = [d.name for d in plan.government.districts]
-    elif (province := match_name(entity_name, province_names)) is not None:
+    elif (prov_obj := plan.government.find_province(entity_name)) is not None:
         entity_type = "province"
-        canonical_name = province
+        canonical_name = prov_obj.name
+        canonical_code = prov_obj.code
         managed_districts = [
-            d.name for d in plan.government.districts if norm(d.province) == norm(province)
+            d.name
+            for d in plan.government.districts
+            if norm(d.province) == norm(prov_obj.name) or (prov_obj.code and norm(d.province) == norm(prov_obj.code))
         ]
     else:
-        locals_found = [
-            ll for ll in plan.government.local_levels if norm(ll.name) == norm(entity_name)
-        ]
+        # Check local levels
+        dist_filter_name = None
+        if district is not None:
+            dist_filter = plan.government.find_district(district)
+            if dist_filter is None:
+                raise EngineInputError(f"District '{district}' is not in this plan's districts.")
+            dist_filter_name = dist_filter.name
+
+        locals_found = plan.government.find_local_level(entity_name, district_identifier=dist_filter_name)
         if not locals_found:
+            # Check if entity exists in another district when district wasn't given
+            all_matching = plan.government.find_local_level(entity_name)
+            if all_matching:
+                raise EngineInputError(
+                    f"Local government '{all_matching[0].name}' is not in district '{district}' in this plan."
+                )
             raise EngineInputError(
                 f"Government entity '{entity_name}' was not found in the plan's government structure."
             )
+
         entity_type = "local"
         canonical_name = locals_found[0].name
-        if district is not None:
-            locals_found = [ll for ll in locals_found if norm(
-                ll.district) == norm(district)]
-            if not locals_found:
-                raise EngineInputError(
-                    f"Local government '{canonical_name}' is not in district '{district}' in this plan."
-                )
-        managed_districts = [ll.district for ll in locals_found]
-        if len(managed_districts) > 1:
+        canonical_code = locals_found[0].code
+        managed_districts = [
+            (plan.government.find_district(ll.district).name if plan.government.find_district(ll.district) else ll.district)
+            for ll in locals_found
+        ]
+        if len(set(managed_districts)) > 1:
             raise EngineInputError(
                 f"'{canonical_name}' is a local government in more than one district "
                 f"{managed_districts}. Say which one with the 'district' field."
@@ -137,7 +152,7 @@ def _resolve_entity(
             f"Specified gov_type '{requested_type}' does not match entity '{entity_name}' (expected '{entity_type}')."
         )
 
-    return entity_type, canonical_name, managed_districts
+    return entity_type, canonical_name, canonical_code, managed_districts
 
 
 def calculate_government_liability(
@@ -153,7 +168,7 @@ def calculate_government_liability(
             f"plan_id '{prof.plan_id}' does not match this plan ('{plan.plan_id}')"
         )
 
-    entity_type, canonical_name, managed_districts = _resolve_entity(
+    entity_type, canonical_name, canonical_code, managed_districts = _resolve_entity(
         plan, prof.gov_entity_name, prof.gov_type, prof.district
     )
 
@@ -249,6 +264,7 @@ def calculate_government_liability(
         district_payments = [
             GovDistrictPayment(
                 district=d,
+                district_code=schedules[d].code,
                 gross_liability=district_gross[d],
                 donation_offset=offset,
                 net_payable=district_gross[d] - offset,
@@ -271,6 +287,7 @@ def calculate_government_liability(
     return GovernmentLiabilityOutput(
         plan_id=plan.plan_id,
         gov_entity_name=canonical_name,
+        gov_entity_code=canonical_code,
         gov_type=entity_type,
         liability_percentage=liability_pct,
         total_donations_received=total_donations_received,

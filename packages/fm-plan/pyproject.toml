@@ -1,0 +1,33 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "disaster-fund-plan"
+version = "0.1.0"
+description = "Disaster Reconstruction & Relief Fund Implementation Plan Builder and Validator"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [{ name = "Pujan Pandey", email = "arghakhanchipujan@gmail.com" }]
+keywords = ["disaster-relief", "fund-management", "reconstruction", "nepal", "grants", "planning"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Topic :: Office/Business :: Financial :: Accounting",
+]
+dependencies = [
+    "pydantic>=2",
+]
+
+[project.scripts]
+fm-plan = "fm_plan.__main__:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]

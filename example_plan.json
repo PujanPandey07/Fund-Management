@@ -18,19 +18,19 @@
   },
 
   "government": {
-    "federal": { "name": "Government of Nepal" },
+    "federal": { "name": "Government of Nepal", "code": "FED" },
     "provinces": [
-      { "name": "Bagmati Province" },
-      { "name": "Gandaki Province" }
+      { "name": "Bagmati Province", "code": "P3" },
+      { "name": "Gandaki Province", "code": "P4" }
     ],
     "districts": [
-      { "name": "Gorkha", "province": "Gandaki Province", "region": "Pahad" },
-      { "name": "Sindhupalchok", "province": "Bagmati Province", "region": "Pahad" }
+      { "name": "Gorkha", "code": "36", "province": "Gandaki Province", "region": "Pahad" },
+      { "name": "Sindhupalchok", "code": "23", "province": "Bagmati Province", "region": "Pahad" }
     ],
     "local_levels": [
-      { "name": "Gorkha Municipality", "district": "Gorkha" },
-      { "name": "Melamchi Municipality", "district": "Sindhupalchok" },
-      { "name": "Helambu Rural Municipality", "district": "Sindhupalchok" }
+      { "name": "Gorkha Municipality", "code": "36001", "district": "Gorkha" },
+      { "name": "Melamchi Municipality", "code": "23001", "district": "Sindhupalchok" },
+      { "name": "Helambu Rural Municipality", "code": "23002", "district": "Sindhupalchok" }
     ]
   },
 

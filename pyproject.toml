@@ -3,13 +3,21 @@ requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "fm-plan"
+name = "fund-management-monorepo"
 version = "0.1.0"
+description = "Monorepo workspace for Disaster Relief & Reconstruction Fund Management"
 requires-python = ">=3.10"
-dependencies = ["pydantic>=2"]
+dependencies = [
+    "pydantic>=2",
+]
 
 [project.optional-dependencies]
-dev = ["pytest"]
+dev = [
+    "pytest",
+    "build",
+    "twine",
+]
 
-[tool.setuptools.packages.find]
-where = ["src"]
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["packages/fm-plan/src", "packages/fm-calculation-engine/src"]

@@ -2,10 +2,12 @@
 
 Two Python packages for the core of a disaster reconstruction fund system. One describes **what the plan is**; the other works out **the money**.
 
-| Package               | Name                    | What it does                                                                                                                                                                 |
-| --------------------- | ----------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 1. Plan builder       | `fm_plan`               | Reads one JSON file describing a reconstruction plan, checks it is consistent, and builds one validated plan object. No money calculation.                                   |
-| 2. Calculation engine | `fm_calculation_engine` | Takes the plan plus beneficiary counts and donations, and works out what each beneficiary receives, what each government owes, and what each district collects and forwards. |
+| Package | Import name | PyPI name | What it does |
+| --- | --- | --- | --- |
+| 1. Plan builder | `fm_plan` | `disaster-fund-plan` | Reads one JSON file describing a reconstruction plan, checks it is consistent, and builds one validated plan object. No money calculation. |
+| 2. Calculation engine | `fm_calculation_engine` | `disaster-fund-management-engine` | Takes the plan plus beneficiary counts and donations, and works out what each beneficiary receives, what each government owes, and what each district collects and forwards. |
+
+Each package has its own README with worked use cases: [`packages/fm-plan/README.md`](packages/fm-plan/README.md) and [`packages/fm-calculation-engine/README.md`](packages/fm-calculation-engine/README.md). This file is the full reference for the whole project.
 
 **Status:** trial implementation, not yet part of a production system. Decisions made and the questions still open are in [`decisions.md`](decisions.md).
 
@@ -16,14 +18,16 @@ From the repository root (Python 3.10 or newer):
 ```powershell
 python -m venv fundenv
 .\fundenv\Scripts\Activate.ps1      # macOS / Linux: source fundenv/bin/activate
-pip install -e ".[dev]"
-pytest                              # run the tests
+pip install -e ".[dev]"             # test and release tools (pytest, build, twine)
+pip install -e .\packages\fm-plan
+pip install -e .\packages\fm-calculation-engine
+pytest                              # run the tests (78 passing)
 python demo_e2e.py                  # run the whole flow on example_plan.json
 ```
 
 ## Contents
 
-Sections 1 to 9 describe package 1 (`fm_plan`). Section 10 describes package 2 (`fm_calculation_engine`).
+Sections 1 to 9 describe package 1 (`fm_plan`, PyPI: `disaster-fund-plan`). Section 10 describes package 2 (`fm_calculation_engine`, PyPI: `disaster-fund-management-engine`).
 
 1. [What the plan answers](#1-what-the-plan-answers)
 2. [Install](#2-install)
@@ -35,7 +39,7 @@ Sections 1 to 9 describe package 1 (`fm_plan`). Section 10 describes package 2 (
 8. [Using it in the overall system](#8-using-it-in-the-overall-system)
 9. [Assumptions and limits](#9-assumptions-and-limits)
 10. [Package 2: Calculation Engine](#10-package-2-calculation-engine-fm_calculation_engine)
-11. [Project layout and tests](#11-project-layout-and-tests)
+11. [Project layout, PyPI packages, and tests](#11-project-layout-and-tests)
 
 ---
 
@@ -55,23 +59,35 @@ The plan ID is **not** an input. It is generated from the plan details.
 
 ## 2. Install
 
-Python 3.10 or newer is needed. From the repository root, with a virtual environment active:
+Both packages can be installed from PyPI (once published) or locally in editable mode from this repository.
+
+### From PyPI (once published)
+
+```bash
+pip install disaster-fund-plan disaster-fund-management-engine
+```
+
+### Locally from source
+
+From the repository root, with a virtual environment active:
 
 ```powershell
 # Windows PowerShell
 python -m venv fundenv
 .\fundenv\Scripts\Activate.ps1
-pip install -e ".[dev]"
+pip install -e .\packages\fm-plan
+pip install -e .\packages\fm-calculation-engine
 ```
 
 ```bash
 # macOS / Linux
 python3 -m venv fundenv
 source fundenv/bin/activate
-pip install -e ".[dev]"
+pip install -e ./packages/fm-plan
+pip install -e ./packages/fm-calculation-engine
 ```
 
-`-e` installs the package in "editable" mode, so changes to the code take effect immediately. `[dev]` also installs `pytest`.
+`-e` installs the packages in "editable" mode so modifications take effect immediately.
 
 ## 3. How to use it
 
@@ -156,23 +172,26 @@ Each entry starts with a district and can be narrowed to local levels and wards,
 
 ### 4.4 `government`
 
-| Field          | Type               | Required        | Meaning                                        |
-| -------------- | ------------------ | --------------- | ---------------------------------------------- |
-| `federal`      | object with `name` | Yes             | The federal government (one only)              |
-| `provinces`    | list               | Yes, at least 1 | Province governments                           |
-| `districts`    | list               | Yes, at least 1 | Districts                                      |
-| `local_levels` | list               | Yes, at least 1 | Local levels. Each is also a local government. |
+| Field          | Type                        | Required        | Meaning                                        |
+| -------------- | --------------------------- | --------------- | ---------------------------------------------- |
+| `federal`      | object with `name`, `code`  | Yes             | The federal government (one only)              |
+| `provinces`    | list                        | Yes, at least 1 | Province governments                           |
+| `districts`    | list                        | Yes, at least 1 | Districts                                      |
+| `local_levels` | list                        | Yes, at least 1 | Local levels. Each is also a local government. |
 
-| Entry            | Field      | Type | Meaning                    | Rules                                                                        |
-| ---------------- | ---------- | ---- | -------------------------- | ---------------------------------------------------------------------------- |
-| `provinces[]`    | `name`     | text | Province name              | Unique                                                                       |
-| `districts[]`    | `name`     | text | District name              | Unique                                                                       |
-| `districts[]`    | `province` | text | The province it belongs to | Must be in `provinces`                                                       |
-| `districts[]`    | `region`   | text | Himal, Pahad or Terai      | Must be in `regions`                                                         |
-| `local_levels[]` | `name`     | text | Local level name           | Unique within its district (the same name may appear in different districts) |
-| `local_levels[]` | `district` | text | The district it belongs to | Must be in `districts`                                                       |
+| Entry            | Field      | Type | Meaning                                   | Rules                                                                        |
+| ---------------- | ---------- | ---- | ----------------------------------------- | ---------------------------------------------------------------------------- |
+| `provinces[]`    | `name`     | text | Province name                             | Unique                                                                       |
+| `provinces[]`    | `code`     | text | Province code (e.g. `P3`, `P4`)           | Optional; unique if given                                                    |
+| `districts[]`    | `name`     | text | District name                             | Unique                                                                       |
+| `districts[]`    | `code`     | text | District code (e.g. `23`, `36`)           | Optional; unique if given                                                    |
+| `districts[]`    | `province` | text | The province it belongs to (name or code) | Must match a province's `name` or `code`                                     |
+| `districts[]`    | `region`   | text | Himal, Pahad or Terai                     | Must be in `regions`                                                         |
+| `local_levels[]` | `name`     | text | Local level name                          | Unique within its district (the same name may appear in different districts) |
+| `local_levels[]` | `code`     | text | Local level code (e.g. `23001`, `36001`)  | Optional; unique across the plan if given                                    |
+| `local_levels[]` | `district` | text | The district it belongs to (name or code) | Must match a district's `name` or `code`                                     |
 
-The `province` on a district and the `district` on a local level are the **"belongs to" links**. They are how the system knows which province pays into which district, and which local levels a district hands money to.
+The `province` on a district and the `district` on a local level are the **"belongs to" links**. They accept either official names or codes. They are how the system knows which province pays into which district, and which local levels a district hands money to. All engine lookups (`DistrictProfile`, `GovEntityProfile`, `BeneficiaryCount`) support lookup by either name or code, and reports include both.
 
 ### 4.5 Lists
 
@@ -590,42 +609,78 @@ District 'Dhading' has beneficiaries but no local levels in this plan's governme
 
 The business rules above that still need the senior's confirmation are listed in `decisions.md`, section 4.
 
-## 11. Project layout and tests
+## 11. Project layout, PyPI packages, and tests
+
+The project is structured as a Python monorepo housing two publishable packages under `packages/`:
 
 ```
 Fund-Management/
 ├── README.md
 ├── decisions.md                    Decisions made, and open questions for the senior
 ├── demo_e2e.py                     Runs the whole flow on example_plan.json and prints it
-├── pyproject.toml
-├── example_plan.json               Sample input, including government_liability
-├── src/
-│   ├── fm_plan/                    Package 1: Plan models, loader, validation
-│   │   ├── __init__.py
-│   │   ├── __main__.py
-│   │   ├── loader.py
-│   │   └── models.py
-│   └── fm_calculation_engine/      Package 2: Calculation engine
-│       ├── __init__.py
-│       ├── common.py               Shared models (Donation, BeneficiaryCount), validation, parse
-│       ├── core.py                 Shared schedule per district and the exact-split rule
-│       ├── beneficiary.py          Output 1: Beneficiary receivable amounts
-│       ├── government.py           Output 2: Government liability & donation rollover
-│       └── district.py             Output 3: District collectible & disbursement
+├── pyproject.toml                  Workspace config (pytest paths, dev tools)
+├── example_plan.json               Sample input, including codes and government_liability
+├── publish_to_pypi.ps1             PowerShell helper to build and upload both packages
+├── .gitignore                      Keeps venvs, build output and caches out of git
+├── packages/
+│   ├── fm-plan/                    PyPI package: disaster-fund-plan
+│   │   ├── pyproject.toml          Package metadata & build config (v0.1.0)
+│   │   ├── README.md               PyPI README for disaster-fund-plan
+│   │   └── src/fm_plan/            Package source code
+│   │       ├── __init__.py
+│   │       ├── __main__.py
+│   │       ├── loader.py
+│   │       └── models.py
+│   └── fm-calculation-engine/      PyPI package: disaster-fund-management-engine
+│       ├── pyproject.toml          Package metadata & build config (v0.1.0, depends on disaster-fund-plan>=0.1.0)
+│       ├── README.md               PyPI README for disaster-fund-management-engine
+│       └── src/fm_calculation_engine/ Package source code
+│           ├── __init__.py
+│           ├── common.py           Shared models (Donation, BeneficiaryCount), validation, parse
+│           ├── core.py             Shared schedule per district and exact-split rule
+│           ├── beneficiary.py      Output 1: Beneficiary receivable amounts
+│           ├── government.py       Output 2: Government liability & donation rollover
+│           └── district.py         Output 3: District collectible & disbursement
 └── tests/
     ├── test_plan.py                Plan validation
     ├── test_engines.py             The three outputs on the sample plan
-    └── test_engine_consistency.py  Counts checked against the plan, and the money adding up
+    └── test_engine_consistency.py  Counts checked against the plan, codes vs names, and money reconciliation
 ```
 
-Run all tests (with the virtual environment active):
+### PyPI Publishing Guide
 
+Build output (`dist/`, `build/`, `*.egg-info/`) is generated and is **not** kept in git. The plan package must be uploaded first, because the engine depends on it.
+
+With the helper script (from the repository root, virtual environment active, `pip install -e ".[dev]"` done):
+
+```powershell
+.\publish_to_pypi.ps1 -BuildOnly            # build and check only, upload nothing
+.\publish_to_pypi.ps1 -Repository testpypi  # build, then upload to TestPyPI (default)
+.\publish_to_pypi.ps1 -Repository pypi      # build, then upload to the real PyPI
 ```
+
+Or by hand:
+
+```bash
+python -m build packages/fm-plan --outdir packages/fm-plan/dist
+python -m build packages/fm-calculation-engine --outdir packages/fm-calculation-engine/dist
+twine check packages/*/dist/*
+twine upload packages/fm-plan/dist/*                  # first
+twine upload packages/fm-calculation-engine/dist/*    # second
+```
+
+Bump `version` in the package's `pyproject.toml` before every upload; PyPI refuses to re-upload a version.
+
+### Running Tests
+
+Run all tests across both packages:
+
+```powershell
 pytest
 ```
 
-Run the demonstration:
+Run the end-to-end demonstration:
 
-```
+```powershell
 python demo_e2e.py
 ```

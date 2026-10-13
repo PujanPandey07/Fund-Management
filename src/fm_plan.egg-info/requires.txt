@@ -1,4 +1,0 @@
-pydantic>=2
-
-[dev]
-pytest

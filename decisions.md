@@ -48,6 +48,16 @@ This document records the architectural and business logic decisions made for bo
 - **Ordering Rule**: All temporary shelter tranches must strictly precede any main reconstruction/retrofitting tranches.
 - **Currencies**: All amounts are whole integers in Nepalese Rupees (no decimals).
 
+### 1.6 Unique Administrative Codes alongside Names
+- **Decision**: Every government body (`Federal`, `Province`, `District`, `LocalLevel`) supports an optional unique administrative code (`code`, e.g. MoFAGA / CBS Geocodes: `P3`, `23`, `23001`) alongside its official `name`.
+- **Referential Flexibility**:
+  - Administrative links can use **either name or code**:
+    - District `province` can specify the province name (e.g. `"Bagmati Province"`) or code (e.g. `"P3"`).
+    - Local level `district` can specify the district name (e.g. `"Sindhupalchok"`) or code (e.g. `"23"`).
+    - Affected areas can reference districts and local levels by name or code.
+- **Uniqueness Constraints**:
+  - Province codes, district codes, and local level codes must each be unique across the plan.
+
 ---
 
 ## 2. Package 2: Calculation Engine (`fm_calculation_engine`)
@@ -124,6 +134,17 @@ This document records the architectural and business logic decisions made for bo
     - Multiple local levels $\to$ allocated equally across local levels in that district (odd rupees go to the first local levels in the plan's order).
     - A district that has beneficiaries but no local levels in the plan's government section is rejected, because its money could not be forwarded (before, it was silently left out of the disbursements).
 
+### 2.7 Dual Code & Name Querying and Reporting
+- **Decision**: All calculation engine interfaces accept administrative bodies by **either code or name**, and report both in the outputs:
+  - `DistrictProfile`: `district_name` accepts either name (e.g. `"Sindhupalchok"`) or code (e.g. `"23"`).
+  - `GovEntityProfile`: `gov_entity_name` accepts name or code for Federal, Province (e.g. `"P3"`), or Local Level (e.g. `"23001"`).
+  - `BeneficiaryCount`: `district` and `local_level` accept either name or code.
+  - Output models include both identifiers:
+    - `DistrictOutput` reports `district_name`, `district_code`, `province_name`, `province_code`.
+    - `LocalGovDisbursement` reports `local_gov` and `local_gov_code`.
+    - `GovDistrictPayment` reports `district` and `district_code`.
+    - `GovernmentLiabilityOutput` reports `gov_entity_name` and `gov_entity_code`.
+
 ---
 
 ## 3. Summary of System Interfaces
@@ -131,5 +152,5 @@ This document records the architectural and business logic decisions made for bo
 | Interface    | Engine Function                  | Input                                                                       | Output Key Details                                                                                                                    |
 | ------------ | -------------------------------- | --------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
 | **Output 1** | `receivable_amounts`             | `BeneficiaryProfile` (plan_id, region, disaster, solution)                  | Tranche amounts (stage, amount) and total grant.                                                                                      |
-| **Output 2** | `calculate_government_liability` | `GovEntityProfile` (plan_id, entity_name, donations) + `beneficiary_counts` | Gross liability, donation applied, net payable, remaining donation, district payments breakdown, and beneficiary summary per tranche. |
-| **Output 3** | `calculate_district_fund`        | `DistrictProfile` (plan_id, district_name) + `beneficiary_counts`           | Collectibles from Fed/Prov/Local and list of forwarding amounts per local government for each tranche.                                |
+| **Output 2** | `calculate_government_liability` | `GovEntityProfile` (plan_id, entity_name, donations) + `beneficiary_counts` | Gross liability, donation applied, net payable, remaining donation, district payments breakdown, and beneficiary summary per tranche. (Includes entity and district codes). |
+| **Output 3** | `calculate_district_fund`        | `DistrictProfile` (plan_id, district_name) + `beneficiary_counts`           | Collectibles from Fed/Prov/Local and list of forwarding amounts per local government for each tranche. (Includes district, province, and local government codes). |
