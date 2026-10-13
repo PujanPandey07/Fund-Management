@@ -53,6 +53,7 @@ counts = [
 | `count` | yes | Number of households, `0` or more |
 | `local_level` | no | Name or code. If omitted, see [use case 6](#6-counts-without-a-local-level) |
 | `region` | no | Taken from the plan's district. If you supply it, it must match the plan |
+| `district_code`, `local_level_code` | no | Optional cross-check. If given, they must match the plan's code for that district / local level, otherwise the row is rejected (a local-level code needs a `local_level`) |
 
 **3. A profile** for the question you are asking (shown in each use case below). Every profile carries the `plan_id`, which must match the loaded plan: this stops results being calculated against the wrong plan version.
 

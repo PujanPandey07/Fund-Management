@@ -158,6 +158,7 @@ warnings.simplefilter("error", DefaultLiabilityWarning)   # make a missing split
 | --- | --- |
 | Dates | Disaster has a start **and** end date; end is not before start. The plan's effective date must start **after** the disaster ends. |
 | Hierarchy | Every district names an existing province; every local level names an existing district. No duplicate province/district names or codes. |
+| Codes | A code identifies exactly one unit across **all** levels (the Federal code `FED`, a province `P3`, a district `23` and a local level `23001` can never overlap). A province or district name may not equal another unit's code. Codes are compared as text, so `036` and `36` are different. |
 | Affected areas | Every listed district and local level exists in the `government` section; no district or local level is listed twice. |
 | Regions | Every district's region is in `regions` (`Himal`, `Pahad`, `Terai`). |
 | Grant matrix | Every row uses known region / disaster / solution names; no repeated row; **no missing combination**. |

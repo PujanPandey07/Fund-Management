@@ -21,7 +21,7 @@ python -m venv fundenv
 pip install -e ".[dev]"             # test and release tools (pytest, build, twine)
 pip install -e .\packages\fm-plan
 pip install -e .\packages\fm-calculation-engine
-pytest                              # run the tests (78 passing)
+pytest                              # run the tests (88 passing)
 python demo_e2e.py                  # run the whole flow on example_plan.json
 ```
 

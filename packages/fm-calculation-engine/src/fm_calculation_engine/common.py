@@ -137,6 +137,25 @@ def validate_beneficiary_counts(
             else:
                 local_level_obj = matching_lls[0]
 
+        if district is not None and b.district_code is not None:
+            if not district.code or norm(b.district_code) != norm(district.code):
+                problems.append(
+                    f"item {idx}: district_code '{b.district_code}' does not match district "
+                    f"'{district.name}' (code '{district.code}' in this plan)"
+                )
+        if b.local_level_code is not None:
+            if not b.local_level:
+                problems.append(
+                    f"item {idx}: local_level_code '{b.local_level_code}' was given without a local_level"
+                )
+            elif local_level_obj is not None and (
+                not local_level_obj.code or norm(b.local_level_code) != norm(local_level_obj.code)
+            ):
+                problems.append(
+                    f"item {idx}: local_level_code '{b.local_level_code}' does not match local level "
+                    f"'{local_level_obj.name}' (code '{local_level_obj.code}' in this plan)"
+                )
+
         local_level_name = local_level_obj.name if local_level_obj else None
         if district is not None and (local_level_name or not b.local_level):
             if not plan.is_affected(district.name, local_level_name):

@@ -197,3 +197,45 @@ def test_loader_lists_every_problem_at_once(tmp_path, data):
     assert "2 problem(s)" in message
     assert "combination(s) missing" in message
     assert "Jhapa" in message
+
+
+# --- codes must identify exactly one unit ------------------------------------
+
+
+def test_code_shared_by_federal_and_province_is_rejected(data):
+    data["government"]["federal"]["code"] = "P3"
+    with pytest.raises(ValidationError, match=r"'P3' \(federal and province\)"):
+        build(data)
+
+
+def test_code_shared_by_district_and_province_is_rejected(data):
+    data["government"]["districts"][0]["code"] = "P3"
+    with pytest.raises(ValidationError, match="more than one administrative level"):
+        build(data)
+
+
+def test_local_level_code_equal_to_district_code_is_rejected(data):
+    data["government"]["local_levels"][0]["code"] = "23"
+    with pytest.raises(ValidationError, match=r"'23' \(district and local level\)"):
+        build(data)
+
+
+def test_district_name_equal_to_another_districts_code_is_rejected(data):
+    data["government"]["districts"][0]["name"] = "23"
+    with pytest.raises(ValidationError):
+        build(data)
+
+
+def test_plan_using_only_codes_is_accepted(data):
+    data["plan"]["affected_areas"] = [
+        {"district": "36"},
+        {"district": "23", "local_levels": [{"name": "23001", "wards": [1, 2, 3]}, {"name": "23002"}]},
+    ]
+    for d in data["government"]["districts"]:
+        d["province"] = {"Gandaki Province": "P4", "Bagmati Province": "P3"}[d["province"]]
+    for ll in data["government"]["local_levels"]:
+        ll["district"] = {"Gorkha": "36", "Sindhupalchok": "23"}[ll["district"]]
+    plan = build(data)
+    assert plan.covers("23", "23001", 2)
+    assert not plan.covers("23", "23001", 9)
+    assert plan.is_affected("36")

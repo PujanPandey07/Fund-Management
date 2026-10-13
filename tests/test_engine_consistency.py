@@ -429,3 +429,54 @@ def test_duplicate_administrative_codes_rejected():
 
     with pytest.raises(Exception, match="duplicate local level code"):
         make_plan(dup_local_code)
+
+
+# ------------------------------------------------------------------------------
+# Code fields on a beneficiary count must agree with the plan
+# ------------------------------------------------------------------------------
+
+
+def test_district_code_that_disagrees_with_the_district_is_rejected():
+    plan = make_plan()
+    bad = count("Gorkha", None, "Reconstruction", 4)
+    bad["district_code"] = "23"  # Sindhupalchok's code, not Gorkha's
+    with pytest.raises(EngineInputError, match="district_code '23' does not match district 'Gorkha'"):
+        district(plan, "Gorkha", [bad])
+
+
+def test_local_level_code_from_another_local_level_is_rejected():
+    plan = make_plan()
+    bad = count("Sindhupalchok", "Melamchi Municipality", "Reconstruction", 4)
+    bad["local_level_code"] = "23002"  # Helambu's code
+    with pytest.raises(EngineInputError, match="local_level_code '23002' does not match"):
+        district(plan, "Sindhupalchok", [bad])
+
+
+def test_local_level_code_without_a_local_level_is_rejected():
+    plan = make_plan()
+    bad = count("Sindhupalchok", None, "Reconstruction", 4)
+    bad["local_level_code"] = "23001"
+    with pytest.raises(EngineInputError, match="without a local_level"):
+        district(plan, "Sindhupalchok", [bad])
+
+
+def test_matching_code_fields_are_accepted_in_any_capitalisation():
+    plan = make_plan()
+    good = count("Sindhupalchok", "Melamchi Municipality", "Reconstruction", 4)
+    good["district_code"] = "23"
+    good["local_level_code"] = "23001"
+    assert district(plan, "Sindhupalchok", [good]).total_beneficiaries == 4
+
+
+def test_names_and_codes_give_identical_money():
+    plan = make_plan()
+    by_name = [count("Sindhupalchok", "Melamchi Municipality", "Reconstruction", 20),
+               count("Gorkha", "Gorkha Municipality", "Reconstruction", 10)]
+    by_code = [count("23", "23001", "Reconstruction", 20),
+               count("36", "36001", "Reconstruction", 10)]
+    for entity_by_name, entity_by_code in (("Government of Nepal", "FED"),
+                                           ("Bagmati Province", "P3"),
+                                           ("Melamchi Municipality", "23001")):
+        a = gov(plan, entity_by_name, by_name)
+        b = gov(plan, entity_by_code, by_code)
+        assert (a.total_gross_liability, a.gov_entity_code) == (b.total_gross_liability, b.gov_entity_code)

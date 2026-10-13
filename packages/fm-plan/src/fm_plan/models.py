@@ -192,6 +192,35 @@ class Government(StrictModel):
             if dupes:
                 raise ValueError(f"duplicate {kind}: {dupes}")
 
+        # A code must identify exactly one unit across ALL levels, otherwise a lookup by
+        # code (for example "P3") could silently pick the wrong government.
+        owners: dict[str, set[str]] = {}
+        spelling: dict[str, str] = {}
+        coded = [("federal", self.federal.code)]
+        coded += [("province", p.code) for p in self.provinces]
+        coded += [("district", d.code) for d in self.districts]
+        coded += [("local level", l.code) for l in self.local_levels]
+        for level, code in coded:
+            if code:
+                owners.setdefault(norm(code), set()).add(level)
+                spelling.setdefault(norm(code), code)
+        shared = sorted(code for code, levels in owners.items() if len(levels) > 1)
+        if shared:
+            raise ValueError(
+                "code used at more than one administrative level: "
+                + ", ".join(f"'{spelling[c]}' ({' and '.join(sorted(owners[c]))})" for c in shared)
+            )
+
+        # Within provinces, and within districts, a name must not equal another unit's code
+        for kind, units in (("province", self.provinces), ("district", self.districts)):
+            names = {norm(u.name): u.name for u in units}
+            for u in units:
+                if u.code and norm(u.code) in names and norm(u.code) != norm(u.name):
+                    raise ValueError(
+                        f"{kind} code '{u.code}' is also the name of {kind} "
+                        f"'{names[norm(u.code)]}', so lookups would be ambiguous"
+                    )
+
         # Check local level name uniqueness per district
         local_pairs = []
         for l in self.local_levels:
