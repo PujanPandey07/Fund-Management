@@ -5,7 +5,7 @@ Two Python packages for the core of a disaster reconstruction fund system. One d
 | Package | Import name | PyPI name | What it does |
 | --- | --- | --- | --- |
 | 1. Plan builder | `fm_plan` | `disaster-fund-plan` | Reads one JSON file describing a reconstruction plan, checks it is consistent, and builds one validated plan object. No money calculation. |
-| 2. Calculation engine | `fm_calculation_engine` | `disaster-fund-management-engine` | Takes the plan plus beneficiary counts and donations, and works out what each beneficiary receives, what each government owes, and what each district collects and forwards. |
+| 2. Calculation engine | `fm_calculation_engine` | `disaster-fund-calculation-engine` | Takes the plan plus beneficiary counts and donations, and works out what each beneficiary receives, what each government owes, and what each district collects and forwards. |
 
 Each package has its own README with worked use cases: [`packages/fm-plan/README.md`](packages/fm-plan/README.md) and [`packages/fm-calculation-engine/README.md`](packages/fm-calculation-engine/README.md). This file is the full reference for the whole project.
 
@@ -46,7 +46,7 @@ pip install -e ".[dev]"
 
 ## Contents
 
-Sections 1 to 9 describe package 1 (`fm_plan`, PyPI: `disaster-fund-plan`). Section 10 describes package 2 (`fm_calculation_engine`, PyPI: `disaster-fund-management-engine`).
+Sections 1 to 9 describe package 1 (`fm_plan`, PyPI: `disaster-fund-plan`). Section 10 describes package 2 (`fm_calculation_engine`, PyPI: `disaster-fund-calculation-engine`).
 
 1. [What the plan answers](#1-what-the-plan-answers)
 2. [Install](#2-install)
@@ -83,7 +83,7 @@ Both packages can be installed from PyPI (once published) or locally in editable
 ### From PyPI (once published)
 
 ```bash
-pip install disaster-fund-plan disaster-fund-management-engine
+pip install disaster-fund-plan disaster-fund-calculation-engine
 ```
 
 ### Locally from source
@@ -650,9 +650,9 @@ Fund-Management/
 │   │       ├── __main__.py
 │   │       ├── loader.py
 │   │       └── models.py
-│   └── fm-calculation-engine/      PyPI package: disaster-fund-management-engine
+│   └── fm-calculation-engine/      PyPI package: disaster-fund-calculation-engine
 │       ├── pyproject.toml          Package metadata & build config (v0.1.0, depends on disaster-fund-plan>=0.1.0)
-│       ├── README.md               PyPI README for disaster-fund-management-engine
+│       ├── README.md               PyPI README for disaster-fund-calculation-engine
 │       └── src/fm_calculation_engine/ Package source code
 │           ├── __init__.py
 │           ├── common.py           Shared models (Donation, BeneficiaryCount), validation, parse
@@ -670,13 +670,14 @@ Fund-Management/
 
 Build output (`dist/`, `build/`, `*.egg-info/`) is generated and is **not** kept in git. The plan package must be uploaded first, because the engine depends on it.
 
-With the helper script (from the repository root, virtual environment active, `pip install -e ".[dev]"` done):
+With the helper script (from the repository root, virtual environment active, `pip install -r requirements-dev.txt` done):
 
 ```powershell
-.\publish_to_pypi.ps1 -BuildOnly            # build and check only, upload nothing
-.\publish_to_pypi.ps1 -Repository testpypi  # build, then upload to TestPyPI (default)
-.\publish_to_pypi.ps1 -Repository pypi      # build, then upload to the real PyPI
+.\publish_to_pypi.ps1 -BuildOnly   # build and check only, upload nothing
+.\publish_to_pypi.ps1              # build, then upload both packages to PyPI (asks you to type YES)
 ```
+
+Twine asks for your credentials: username `__token__` and, as the password, a PyPI API token (create one at pypi.org -> Account settings -> API tokens).
 
 Or by hand:
 

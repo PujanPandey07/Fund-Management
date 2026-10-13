@@ -2,15 +2,14 @@
 #
 # Usage (from the repository root, with your virtual environment activated):
 #   .\publish_to_pypi.ps1 -BuildOnly            # build only, upload nothing
-#   .\publish_to_pypi.ps1 -Repository testpypi  # build, then upload to TestPyPI
-#   .\publish_to_pypi.ps1 -Repository pypi      # build, then upload to real PyPI
+#   .\publish_to_pypi.ps1                       # build, then upload to PyPI (asks you to confirm)
 #
 # Needs:  pip install -r requirements-dev.txt   (installs build and twine)
 # The plan package is always uploaded first, because the engine depends on it.
 
 param(
     [ValidateSet("pypi", "testpypi")]
-    [string]$Repository = "testpypi",
+    [string]$Repository = "pypi",
     [switch]$BuildOnly
 )
 
@@ -25,7 +24,7 @@ foreach ($module in @("build", "twine")) {
 
 $Packages = @(
     @{ Name = "disaster-fund-plan";              Path = "packages\fm-plan" },
-    @{ Name = "disaster-fund-management-engine"; Path = "packages\fm-calculation-engine" }
+    @{ Name = "disaster-fund-calculation-engine"; Path = "packages\fm-calculation-engine" }
 )
 
 Write-Host "Building distributions..." -ForegroundColor Cyan
@@ -44,6 +43,9 @@ if ($BuildOnly) {
     Write-Host "BuildOnly given: nothing uploaded." -ForegroundColor Cyan
     exit 0
 }
+
+Write-Host "About to upload to $Repository. A published version can never be replaced or re-used." -ForegroundColor Red
+if ((Read-Host "Type YES to continue") -ne "YES") { Write-Host "Cancelled."; exit 1 }
 
 foreach ($pkg in $Packages) {
     Write-Host "Uploading $($pkg.Name) to $Repository..." -ForegroundColor Yellow

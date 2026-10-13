@@ -2,7 +2,7 @@
 
 **Describe a disaster reconstruction plan in one JSON file, and get it checked before any money is calculated.**
 
-`disaster-fund-plan` reads a plan file, validates it, and gives you one trusted `ImplementationPlan` object. It does **no money calculation**: it only answers *"what is the plan?"* The companion package [`disaster-fund-management-engine`](https://pypi.org/project/disaster-fund-management-engine/) takes this plan and works out the money.
+`disaster-fund-plan` reads a plan file, validates it, and gives you one trusted `ImplementationPlan` object. It does **no money calculation**: it only answers *"what is the plan?"* The companion package [`disaster-fund-calculation-engine`](https://pypi.org/project/disaster-fund-calculation-engine/) takes this plan and works out the money.
 
 - Python 3.10 or newer
 - Only dependency: `pydantic>=2`
@@ -223,7 +223,7 @@ Changing the plan version creates a new ID, so results from different plan versi
 ## Limits
 
 - Amounts are whole rupees (no paisa).
-- The plan describes *rates and structure*. Counts of actual beneficiaries, donations and all money calculations belong to `disaster-fund-management-engine`.
+- The plan describes *rates and structure*. Counts of actual beneficiaries, donations and all money calculations belong to `disaster-fund-calculation-engine`.
 
 ## License
 

@@ -1,4 +1,4 @@
-# disaster-fund-management-engine
+# disaster-fund-calculation-engine
 
 **Turn a validated disaster plan plus beneficiary counts into exact rupee figures: what a household receives, what each government owes, and what each district collects and forwards.**
 
@@ -6,10 +6,10 @@ It is the calculation half of the system. The plan itself (structure, grant rate
 
 - Python 3.10 or newer
 - Dependencies: `disaster-fund-plan`, `pydantic>=2`
-- Import name: `fm_calculation_engine` (the PyPI name is `disaster-fund-management-engine`)
+- Import name: `fm_calculation_engine` (the PyPI name is `disaster-fund-calculation-engine`)
 
 ```bash
-pip install disaster-fund-management-engine
+pip install disaster-fund-calculation-engine
 ```
 
 ---
