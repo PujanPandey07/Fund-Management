@@ -3,8 +3,7 @@ from typing import Annotated
 
 from pydantic import Field, ValidationError
 
-from fm_plan import ImplementationPlan
-from fm_plan.models import NonEmptyStr, StrictModel, norm
+from fm_plan import ImplementationPlan, NonEmptyStr, StrictModel, norm
 
 
 class EngineInputError(Exception):
@@ -61,8 +60,8 @@ class BeneficiaryCount(StrictModel):
         ge=0, description="Number of beneficiary households")]
     region: NonEmptyStr | None = None
     local_level: NonEmptyStr | None = None
-    district_code: str | None = None
-    local_level_code: str | None = None
+    district_code: NonEmptyStr | None = None
+    local_level_code: NonEmptyStr | None = None
 
 
 def match_name(value: str, allowed: list[str]) -> str | None:

@@ -1,5 +1,4 @@
-from fm_plan import ImplementationPlan
-from fm_plan.models import NonEmptyStr, StrictModel, norm
+from fm_plan import ImplementationPlan, NonEmptyStr, StrictModel, norm
 
 from fm_calculation_engine.common import (
     BeneficiaryCount,

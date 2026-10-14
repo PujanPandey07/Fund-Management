@@ -21,7 +21,9 @@ classifiers = [
     "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
     "Topic :: Office/Business :: Financial :: Accounting",
+    "Development Status :: 3 - Alpha",
 ]
+
 dependencies = [
     "disaster-fund-plan>=0.1.0",
     "pydantic>=2",
@@ -29,3 +31,7 @@ dependencies = [
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+
+[project.urls]
+Repository = "https://github.com/arghakhanchipujan/Fund-Management"

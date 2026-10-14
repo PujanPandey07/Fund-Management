@@ -21,7 +21,9 @@ classifiers = [
     "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
     "Topic :: Office/Business :: Financial :: Accounting",
+    "Development Status :: 3 - Alpha",
 ]
+
 dependencies = [
     "pydantic>=2",
 ]
@@ -31,3 +33,7 @@ fm-plan = "fm_plan.__main__:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+
+[project.urls]
+Repository = "https://github.com/arghakhanchipujan/Fund-Management"

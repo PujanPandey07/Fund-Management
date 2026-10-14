@@ -1,4 +1,4 @@
-# Fund Management for Disaster Reconstruction
+﻿# Fund Management for Disaster Reconstruction
 
 Two Python packages for the core of a disaster reconstruction fund system. One describes **what the plan is**; the other works out **the money**.
 
@@ -21,7 +21,7 @@ python -m venv fundenv
 pip install -e ".[dev]"             # test and release tools (pytest, build, twine)
 pip install -e .\packages\fm-plan
 pip install -e .\packages\fm-calculation-engine
-pytest                              # run the tests (88 passing)
+pytest                              # run the tests (89 passing)
 python demo_e2e.py                  # run the whole flow on example_plan.json
 ```
 
@@ -162,7 +162,7 @@ All values in the sample file (`example_plan.json`) are made up. Only the shape 
 | `regions`              | List of region names                                                                   |
 | `disaster_types`       | List of disaster type names                                                            |
 | `solution_types`       | List of solution type names                                                            |
-| `grant_matrix`         | One row per region × disaster type × solution type, with tranche amounts               |
+| `grant_matrix`         | One row per region Ã— disaster type Ã— solution type, with tranche amounts               |
 | `government_liability` | How the cost is shared: federal, province and local percentages. Optional, but see 4.7 |
 
 ### 4.2 `plan`
@@ -222,7 +222,7 @@ The `province` on a district and the `district` on a local level are the **"belo
 
 ### 4.6 `grant_matrix[]`
 
-Each row is one cell of the region × disaster × solution table.
+Each row is one cell of the region Ã— disaster Ã— solution table.
 
 | Field               | Type         | Required | Meaning                 | Rules                                                                       |
 | ------------------- | ------------ | -------- | ----------------------- | --------------------------------------------------------------------------- |
@@ -295,7 +295,7 @@ The three must add up to exactly 100. Decimals such as `33.33` are allowed.
 | Districts      | Every district's `region` is in `regions`                                                                                    |
 | Grant matrix   | Every row uses names that are in the three lists                                                                             |
 | Grant matrix   | No row is repeated                                                                                                           |
-| Grant matrix   | **Every region × disaster × solution combination has a row**                                                                 |
+| Grant matrix   | **Every region Ã— disaster Ã— solution combination has a row**                                                                 |
 | Tranches       | At least one tranche per row; stage is `shelter` or `main`; shelter tranches come first; amount is a whole number above zero |
 | Liability      | Each of `federal`, `province`, `local` is between 0 and 100, and the three add up to 100                                     |
 | Liability      | If `government_liability` is missing, the default 50 / 30 / 20 is used and a `DefaultLiabilityWarning` is raised             |
@@ -354,13 +354,13 @@ broken.json is not valid JSON (line 37, column 13): Expecting ':' delimiter
 
 ```
  Frontend form                 fm_plan (this package)             Engine (package 2)
- ┌────────────────┐   JSON    ┌──────────────────────┐   plan    ┌────────────────────────┐
- │ cascading      │ ────────► │ validate + build the │ ────────► │ required fund per      │
- │ dropdowns,     │           │ Implementation Plan  │  object   │ tranche, government    │
- │ matrix entry   │ ◄──────── │ object               │           │ liability, district    │
- └────────────────┘  errors   └──────────────────────┘           │ collection             │
-                                                                  └───────────▲────────────┘
-                                                                              │ beneficiary counts
+ â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”   JSON    â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”   plan    â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”
+ â”‚ cascading      â”‚ â”€â”€â”€â”€â”€â”€â”€â”€â–º â”‚ validate + build the â”‚ â”€â”€â”€â”€â”€â”€â”€â”€â–º â”‚ required fund per      â”‚
+ â”‚ dropdowns,     â”‚           â”‚ Implementation Plan  â”‚  object   â”‚ tranche, government    â”‚
+ â”‚ matrix entry   â”‚ â—„â”€â”€â”€â”€â”€â”€â”€â”€ â”‚ object               â”‚           â”‚ liability, district    â”‚
+ â””â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”˜  errors   â””â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”˜           â”‚ collection             â”‚
+                                                                  â””â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â–²â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”˜
+                                                                              â”‚ beneficiary counts
                                                                        Beneficiary data
 ```
 
@@ -419,7 +419,7 @@ Revising a plan means creating a new file with a higher `plan_version`. The new 
 
 | Assumption or limit                                            | Detail                                                                                                                                                                                              |
 | -------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Every region × disaster × solution combination applies         | All are required. A "not applicable" option can be added if some do not.                                                                                                                            |
+| Every region Ã— disaster Ã— solution combination applies         | All are required. A "not applicable" option can be added if some do not.                                                                                                                            |
 | Every district has exactly one region                          | Himal, Pahad or Terai                                                                                                                                                                               |
 | Temporary shelter is a stage inside each grant                 | Tranches are labelled `shelter` or `main`, and shelter comes first                                                                                                                                  |
 | Everyone in the same grid cell gets the same amount            | Damage level decides the solution type, not the amount                                                                                                                                              |
@@ -586,7 +586,7 @@ With the sample plan and counts, tranche 1 is Rs. 550000: federal 275000, provin
 
 ### 10.5 How the numbers are worked out
 
-1. For each tranche round, each household group needs `count × the grant amount for that round`. The grant comes from the plan's grant matrix row for the district's region, the disaster type and the solution type.
+1. For each tranche round, each household group needs `count Ã— the grant amount for that round`. The grant comes from the plan's grant matrix row for the district's region, the disaster type and the solution type.
 2. A district's total for the round is split between federal, province and local in proportion to `government_liability`.
 3. The district's local share is split between its local levels in proportion to what each one must pay out.
 4. A government's liability is its share from steps 2 and 3. Donations are then taken off, from tranche 1 onward; any surplus rolls over to the next tranche.
@@ -634,36 +634,36 @@ The project is structured as a Python monorepo housing two publishable packages 
 
 ```
 Fund-Management/
-├── README.md
-├── decisions.md                    Decisions made, and open questions for the senior
-├── demo_e2e.py                     Runs the whole flow on example_plan.json and prints it
-├── pyproject.toml                  Workspace config (pytest paths, dev tools)
-├── example_plan.json               Sample input, including codes and government_liability
-├── publish_to_pypi.ps1             PowerShell helper to build and upload both packages
-├── .gitignore                      Keeps venvs, build output and caches out of git
-├── packages/
-│   ├── fm-plan/                    PyPI package: disaster-fund-plan
-│   │   ├── pyproject.toml          Package metadata & build config (v0.1.0)
-│   │   ├── README.md               PyPI README for disaster-fund-plan
-│   │   └── src/fm_plan/            Package source code
-│   │       ├── __init__.py
-│   │       ├── __main__.py
-│   │       ├── loader.py
-│   │       └── models.py
-│   └── fm-calculation-engine/      PyPI package: disaster-fund-calculation-engine
-│       ├── pyproject.toml          Package metadata & build config (v0.1.0, depends on disaster-fund-plan>=0.1.0)
-│       ├── README.md               PyPI README for disaster-fund-calculation-engine
-│       └── src/fm_calculation_engine/ Package source code
-│           ├── __init__.py
-│           ├── common.py           Shared models (Donation, BeneficiaryCount), validation, parse
-│           ├── core.py             Shared schedule per district and exact-split rule
-│           ├── beneficiary.py      Output 1: Beneficiary receivable amounts
-│           ├── government.py       Output 2: Government liability & donation rollover
-│           └── district.py         Output 3: District collectible & disbursement
-└── tests/
-    ├── test_plan.py                Plan validation
-    ├── test_engines.py             The three outputs on the sample plan
-    └── test_engine_consistency.py  Counts checked against the plan, codes vs names, and money reconciliation
+â”œâ”€â”€ README.md
+â”œâ”€â”€ decisions.md                    Decisions made, and open questions for the senior
+â”œâ”€â”€ demo_e2e.py                     Runs the whole flow on example_plan.json and prints it
+â”œâ”€â”€ pyproject.toml                  Workspace config (pytest paths, dev tools)
+â”œâ”€â”€ example_plan.json               Sample input, including codes and government_liability
+â”œâ”€â”€ publish_to_pypi.ps1             PowerShell helper to build and upload both packages
+â”œâ”€â”€ .gitignore                      Keeps venvs, build output and caches out of git
+â”œâ”€â”€ packages/
+â”‚   â”œâ”€â”€ fm-plan/                    PyPI package: disaster-fund-plan
+â”‚   â”‚   â”œâ”€â”€ pyproject.toml          Package metadata & build config (v0.1.0)
+â”‚   â”‚   â”œâ”€â”€ README.md               PyPI README for disaster-fund-plan
+â”‚   â”‚   â””â”€â”€ src/fm_plan/            Package source code
+â”‚   â”‚       â”œâ”€â”€ __init__.py
+â”‚   â”‚       â”œâ”€â”€ __main__.py
+â”‚   â”‚       â”œâ”€â”€ loader.py
+â”‚   â”‚       â””â”€â”€ models.py
+â”‚   â””â”€â”€ fm-calculation-engine/      PyPI package: disaster-fund-calculation-engine
+â”‚       â”œâ”€â”€ pyproject.toml          Package metadata & build config (v0.1.0, depends on disaster-fund-plan>=0.1.0)
+â”‚       â”œâ”€â”€ README.md               PyPI README for disaster-fund-calculation-engine
+â”‚       â””â”€â”€ src/fm_calculation_engine/ Package source code
+â”‚           â”œâ”€â”€ __init__.py
+â”‚           â”œâ”€â”€ common.py           Shared models (Donation, BeneficiaryCount), validation, parse
+â”‚           â”œâ”€â”€ core.py             Shared schedule per district and exact-split rule
+â”‚           â”œâ”€â”€ beneficiary.py      Output 1: Beneficiary receivable amounts
+â”‚           â”œâ”€â”€ government.py       Output 2: Government liability & donation rollover
+â”‚           â””â”€â”€ district.py         Output 3: District collectible & disbursement
+â””â”€â”€ tests/
+    â”œâ”€â”€ test_plan.py                Plan validation
+    â”œâ”€â”€ test_engines.py             The three outputs on the sample plan
+    â””â”€â”€ test_engine_consistency.py  Counts checked against the plan, codes vs names, and money reconciliation
 ```
 
 ### PyPI Publishing Guide

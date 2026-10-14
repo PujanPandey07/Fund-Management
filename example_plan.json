@@ -6,12 +6,12 @@
     "disaster_date_range": { "start": "2015-04-25", "end": "2015-05-12" },
     "effective_date_range": { "start": "2015-09-01", "end": null },
     "affected_areas": [
-      { "district": "Gorkha" },
+      { "district": "36" },
       {
-        "district": "Sindhupalchok",
+        "district": "23",
         "local_levels": [
-          { "name": "Melamchi Municipality", "wards": [1, 2, 3] },
-          { "name": "Helambu Rural Municipality" }
+          { "code": "23001", "wards": [1, 2, 3] },
+          { "code": "23002" }
         ]
       }
     ]
@@ -24,13 +24,13 @@
       { "name": "Gandaki Province", "code": "P4" }
     ],
     "districts": [
-      { "name": "Gorkha", "code": "36", "province": "Gandaki Province", "region": "Pahad" },
-      { "name": "Sindhupalchok", "code": "23", "province": "Bagmati Province", "region": "Pahad" }
+      { "name": "Gorkha", "code": "36", "province": "P4", "region": "Pahad" },
+      { "name": "Sindhupalchok", "code": "23", "province": "P3", "region": "Pahad" }
     ],
     "local_levels": [
-      { "name": "Gorkha Municipality", "code": "36001", "district": "Gorkha" },
-      { "name": "Melamchi Municipality", "code": "23001", "district": "Sindhupalchok" },
-      { "name": "Helambu Rural Municipality", "code": "23002", "district": "Sindhupalchok" }
+      { "name": "Gorkha Municipality", "code": "36001", "district": "36" },
+      { "name": "Melamchi Municipality", "code": "23001", "district": "23" },
+      { "name": "Helambu Rural Municipality", "code": "23002", "district": "23" }
     ]
   },
 

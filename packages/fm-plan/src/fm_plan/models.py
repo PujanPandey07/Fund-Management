@@ -62,21 +62,21 @@ class ClosedDateRange(DateRange):
 
 
 class AffectedLocalLevel(StrictModel):
-    name: NonEmptyStr
+    code: NonEmptyStr  # official code of the local level (e.g. '23001')
     wards: list[PositiveInt] = []  # empty list means the whole local level
 
 
 class AffectedArea(StrictModel):
-    district: NonEmptyStr
+    district: NonEmptyStr  # official code of the district (e.g. '23')
     # empty means the whole district
     local_levels: list[AffectedLocalLevel] = []
 
     @model_validator(mode="after")
     def no_repeated_local_level(self):
-        names = repeated(norm(ll.name) for ll in self.local_levels)
-        if names:
+        codes = repeated(norm(ll.code) for ll in self.local_levels)
+        if codes:
             raise ValueError(
-                f"district '{self.district}' lists a local level more than once: {names}"
+                f"district '{self.district}' lists a local level more than once: {codes}"
             )
         return self
 
@@ -112,26 +112,26 @@ class PlanDetails(StrictModel):
 
 class Federal(StrictModel):
     name: NonEmptyStr
-    code: NonEmptyStr | None = None
+    code: NonEmptyStr
 
 
 class Province(StrictModel):
     name: NonEmptyStr
-    code: NonEmptyStr | None = None
+    code: NonEmptyStr
 
 
 class District(StrictModel):
     name: NonEmptyStr
-    province: NonEmptyStr  # "belongs to" link: name or code of one of the provinces
+    province: NonEmptyStr  # "belongs to" link: code of one of the provinces
     # Himal, Pahad or Terai (checked against the regions list later)
     region: NonEmptyStr
-    code: NonEmptyStr | None = None
+    code: NonEmptyStr
 
 
 class LocalLevel(StrictModel):
     name: NonEmptyStr
-    district: NonEmptyStr  # "belongs to" link: name or code of one of the districts
-    code: NonEmptyStr | None = None
+    district: NonEmptyStr  # "belongs to" link: code of one of the districts
+    code: NonEmptyStr
 
 
 class Government(StrictModel):
@@ -143,14 +143,14 @@ class Government(StrictModel):
     def find_province(self, identifier: str) -> Province | None:
         target = norm(identifier)
         for p in self.provinces:
-            if norm(p.name) == target or (p.code and norm(p.code) == target):
+            if norm(p.name) == target or norm(p.code) == target:
                 return p
         return None
 
     def find_district(self, identifier: str) -> District | None:
         target = norm(identifier)
         for d in self.districts:
-            if norm(d.name) == target or (d.code and norm(d.code) == target):
+            if norm(d.name) == target or norm(d.code) == target:
                 return d
         return None
 
@@ -161,12 +161,12 @@ class Government(StrictModel):
         results = []
         target_dist = self.find_district(district_identifier) if district_identifier else None
         for l in self.local_levels:
-            matches_name_or_code = norm(l.name) == target or (l.code and norm(l.code) == target)
+            matches_name_or_code = norm(l.name) == target or norm(l.code) == target
             if not matches_name_or_code:
                 continue
             if target_dist:
-                l_dist = self.find_district(l.district)
-                if l_dist and norm(l_dist.name) == norm(target_dist.name):
+                # l.district is a district code; target_dist can be matched by code or name
+                if norm(l.district) == norm(target_dist.code):
                     results.append(l)
             else:
                 results.append(l)
@@ -176,9 +176,9 @@ class Government(StrictModel):
     def check_names_and_links(self):
         province_names = [norm(p.name) for p in self.provinces]
         district_names = [norm(d.name) for d in self.districts]
-        province_codes = [norm(p.code) for p in self.provinces if p.code]
-        district_codes = [norm(d.code) for d in self.districts if d.code]
-        local_codes = [norm(l.code) for l in self.local_levels if l.code]
+        province_codes = [norm(p.code) for p in self.provinces]
+        district_codes = [norm(d.code) for d in self.districts]
+        local_codes = [norm(l.code) for l in self.local_levels]
 
         # Check duplicate names and duplicate codes
         for kind, items in (
@@ -201,9 +201,8 @@ class Government(StrictModel):
         coded += [("district", d.code) for d in self.districts]
         coded += [("local level", l.code) for l in self.local_levels]
         for level, code in coded:
-            if code:
-                owners.setdefault(norm(code), set()).add(level)
-                spelling.setdefault(norm(code), code)
+            owners.setdefault(norm(code), set()).add(level)
+            spelling.setdefault(norm(code), code)
         shared = sorted(code for code, levels in owners.items() if len(levels) > 1)
         if shared:
             raise ValueError(
@@ -215,35 +214,33 @@ class Government(StrictModel):
         for kind, units in (("province", self.provinces), ("district", self.districts)):
             names = {norm(u.name): u.name for u in units}
             for u in units:
-                if u.code and norm(u.code) in names and norm(u.code) != norm(u.name):
+                if norm(u.code) in names and norm(u.code) != norm(u.name):
                     raise ValueError(
                         f"{kind} code '{u.code}' is also the name of {kind} "
                         f"'{names[norm(u.code)]}', so lookups would be ambiguous"
                     )
 
         # Check local level name uniqueness per district
-        local_pairs = []
-        for l in self.local_levels:
-            dist_obj = self.find_district(l.district)
-            dist_key = norm(dist_obj.name) if dist_obj else norm(l.district)
-            local_pairs.append((dist_key, norm(l.name)))
-
+        local_pairs = [(norm(l.district), norm(l.name)) for l in self.local_levels]
         dupes_local = repeated(local_pairs)
         if dupes_local:
             raise ValueError(f"duplicate local level (district, name): {dupes_local}")
 
-        # "Belongs to" links must point at something that exists (by name or code)
+        # "Belongs to" links must use codes
+        province_codes_set = set(province_codes)
+        district_codes_set = set(district_codes)
+
         for d in self.districts:
-            if self.find_province(d.province) is None:
+            if norm(d.province) not in province_codes_set:
                 raise ValueError(
-                    f"district '{d.name}' is in province '{d.province}', "
-                    "which is not in the provinces list"
+                    f"district '{d.name}' specifies province '{d.province}', "
+                    "which is not a valid province code in this plan"
                 )
         for l in self.local_levels:
-            if self.find_district(l.district) is None:
+            if norm(l.district) not in district_codes_set:
                 raise ValueError(
-                    f"local level '{l.name}' is in district '{l.district}', "
-                    "which is not in the districts list"
+                    f"local level '{l.name}' specifies district '{l.district}', "
+                    "which is not a valid district code in this plan"
                 )
         return self
 
@@ -408,18 +405,19 @@ class ImplementationPlan(StrictModel):
             problems.append(
                 f"{len(missing)} matrix combination(s) missing: {shown}{more}")
 
-        # 5. Affected areas exist in the government section
+        # 5. Affected areas must use district codes and local level codes
+        district_codes_set = {norm(d.code) for d in self.government.districts}
         for area in self.plan.affected_areas:
-            dist_obj = self.government.find_district(area.district)
-            if dist_obj is None:
+            if norm(area.district) not in district_codes_set:
                 problems.append(
-                    f"affected district '{area.district}' is not in government.districts")
+                    f"affected district '{area.district}' is not a known district code in government.districts")
                 continue
+            dist_obj = self.government.find_district(area.district)
             for ll in area.local_levels:
-                matching_lls = self.government.find_local_level(ll.name, dist_obj.name)
+                matching_lls = self.government.find_local_level(ll.code, dist_obj.name)
                 if not matching_lls:
                     problems.append(
-                        f"affected local level '{ll.name}' is not in district '{area.district}'"
+                        f"affected local level '{ll.code}' is not in district '{area.district}'"
                     )
 
         if problems:
@@ -461,9 +459,9 @@ class ImplementationPlan(StrictModel):
                         ll_keys.add(norm(match.code))
 
             for area_ll in area.local_levels:
-                area_ll_keys = {norm(area_ll.name)}
+                area_ll_keys = {norm(area_ll.code)}
                 if area_d:
-                    for match in self.government.find_local_level(area_ll.name, area_d.name):
+                    for match in self.government.find_local_level(area_ll.code, area_d.name):
                         area_ll_keys.add(norm(match.name))
                         if match.code:
                             area_ll_keys.add(norm(match.code))
@@ -503,9 +501,9 @@ class ImplementationPlan(StrictModel):
                         ll_keys.add(norm(match.code))
 
             for ll in area.local_levels:
-                area_ll_keys = {norm(ll.name)}
+                area_ll_keys = {norm(ll.code)}
                 if area_d:
-                    for match in self.government.find_local_level(ll.name, area_d.name):
+                    for match in self.government.find_local_level(ll.code, area_d.name):
                         area_ll_keys.add(norm(match.name))
                         if match.code:
                             area_ll_keys.add(norm(match.code))

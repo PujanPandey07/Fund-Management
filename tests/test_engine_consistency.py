@@ -111,10 +111,10 @@ def test_beneficiary_summary_region_comes_from_the_plan():
 def test_district_outside_the_affected_areas_is_rejected():
     def add_dhading(data):
         data["government"]["districts"].append(
-            {"name": "Dhading", "province": "Bagmati Province", "region": "Pahad"}
+            {"name": "Dhading", "code": "30", "province": "P3", "region": "Pahad"}
         )
         data["government"]["local_levels"].append(
-            {"name": "Nilkantha Municipality", "district": "Dhading"})
+            {"name": "Nilkantha Municipality", "code": "30001", "district": "30"})
 
     plan = make_plan(add_dhading)
     with pytest.raises(EngineInputError, match="district 'Dhading' is not in this plan's affected areas"):
@@ -125,7 +125,7 @@ def test_district_outside_the_affected_areas_is_rejected():
 def test_local_level_outside_the_affected_areas_is_rejected():
     def add_local(data):
         data["government"]["local_levels"].append(
-            {"name": "Sunkoshi Rural Municipality", "district": "Sindhupalchok"}
+            {"name": "Sunkoshi Rural Municipality", "code": "23003", "district": "23"}
         )
 
     plan = make_plan(add_local)
@@ -257,9 +257,9 @@ def test_same_named_local_level_in_two_districts():
             if ll["name"] == "Gorkha Municipality":
                 ll["name"] = "Central Municipality"
         data["government"]["local_levels"].append(
-            {"name": "Central Municipality", "district": "Sindhupalchok"})
+            {"name": "Central Municipality", "code": "23003", "district": "23"})
         data["plan"]["affected_areas"][1]["local_levels"].append(
-            {"name": "Central Municipality"})
+            {"code": "23003"})
 
     plan = make_plan(same_name)
     counts = [
@@ -286,8 +286,8 @@ def test_district_only_allowed_for_local_governments():
 def test_beneficiaries_in_a_district_with_no_local_levels_are_rejected():
     def no_locals(data):
         data["government"]["districts"].append(
-            {"name": "Dhading", "province": "Bagmati Province", "region": "Pahad"})
-        data["plan"]["affected_areas"].append({"district": "Dhading"})
+            {"name": "Dhading", "code": "30", "province": "P3", "region": "Pahad"})
+        data["plan"]["affected_areas"].append({"district": "30"})
 
     plan = make_plan(no_locals)
     with pytest.raises(EngineInputError, match="no local levels"):
@@ -364,14 +364,8 @@ def test_is_affected_ignores_wards():
 def test_administrative_codes_linking_and_lookups():
     # Plan where districts link to provinces via province code, and local levels link via district code
     def use_code_links(data):
-        data["government"]["districts"][0]["province"] = "P4"  # Gandaki
-        data["government"]["districts"][1]["province"] = "P3"  # Bagmati
-        data["government"]["local_levels"][0]["district"] = "36"  # Gorkha
-        data["government"]["local_levels"][1]["district"] = "23"  # Sindhupalchok
-        data["government"]["local_levels"][2]["district"] = "23"
-        data["plan"]["affected_areas"][0]["district"] = "36"
-        data["plan"]["affected_areas"][1]["district"] = "23"
-        data["plan"]["affected_areas"][1]["local_levels"][0]["name"] = "23001"
+        # sample plan already links using codes; ensure local level code is set
+        data["plan"]["affected_areas"][1]["local_levels"][0]["code"] = "23001"
 
     plan = make_plan(use_code_links)
     assert plan.is_affected("36")
@@ -480,3 +474,11 @@ def test_names_and_codes_give_identical_money():
         a = gov(plan, entity_by_name, by_name)
         b = gov(plan, entity_by_code, by_code)
         assert (a.total_gross_liability, a.gov_entity_code) == (b.total_gross_liability, b.gov_entity_code)
+
+
+def test_beneficiary_count_code_cannot_be_empty_string():
+    plan = make_plan()
+    item = count('Gorkha', 'Gorkha Municipality', 'Reconstruction', 10)
+    item['district_code'] = '   '
+    with pytest.raises(EngineInputError):
+        district(plan, 'Gorkha', [item])

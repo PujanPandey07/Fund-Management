@@ -57,9 +57,9 @@ BAD_CASES = [
     ("no tranches", lambda d: d["grant_matrix"]
      [0].update(tranches=[]), "at least 1 item"),
     ("province typo", lambda d: d["government"]["districts"][0].update(
-        province="Bagmti Province"), "not in the provinces list"),
+        province="P99"), "is not a valid province code in this plan"),
     ("local level in unknown district", lambda d: d["government"]["local_levels"][0].update(
-        district="Jhapa"), "not in the districts list"),
+        district="999"), "is not a valid district code in this plan"),
     ("duplicate district", lambda d: d["government"]["districts"].append(
         copy.deepcopy(d["government"]["districts"][0])), "duplicate district"),
     ("district region not in regions", lambda d: d["government"]["districts"][0].update(
@@ -67,11 +67,11 @@ BAD_CASES = [
     ("duplicate in a list", lambda d: d["regions"].append(
         "himal"), "has duplicates"),
     ("affected district unknown", lambda d: d["plan"]["affected_areas"].append(
-        {"district": "Jhapa"}), "not in government.districts"),
+        {"district": "999"}), "is not a known district code in government.districts"),
     ("affected local level under wrong district", lambda d: d["plan"]["affected_areas"][0].update(
-        local_levels=[{"name": "Melamchi Municipality"}]), "is not in district"),
+        local_levels=[{"code": "23001"}]), "is not in district"),
     ("same district listed twice", lambda d: d["plan"]["affected_areas"].append(
-        {"district": "gorkha"}), "more than once"),
+        {"district": "36"}), "more than once"),
     ("no affected areas", lambda d: d["plan"].update(
         affected_areas=[]), "at least 1 item"),
     ("plan version zero", lambda d: d["plan"].update(
@@ -112,8 +112,8 @@ def test_effective_end_date_is_optional(data):
 
 
 def test_names_ignore_capital_letters(data):
-    data["plan"]["affected_areas"][1]["district"] = "sindhupalchok"
-    data["government"]["districts"][0]["province"] = "GANDAKI PROVINCE"
+    data["plan"]["affected_areas"][1]["district"] = "23"
+    data["government"]["districts"][0]["province"] = "p4"
     data["grant_matrix"][0]["region"] = "himal"
     data["grant_matrix"][0]["tranches"][0]["stage"] = "Shelter"
     build(data)  # must not raise
@@ -121,7 +121,7 @@ def test_names_ignore_capital_letters(data):
 
 def test_same_local_level_name_allowed_in_different_districts(data):
     data["government"]["local_levels"].append(
-        {"name": "Melamchi Municipality", "district": "Gorkha"}
+        {"name": "Melamchi Municipality", "code": "36002", "district": "36"}
     )
     build(data)  # must not raise
 
@@ -227,14 +227,6 @@ def test_district_name_equal_to_another_districts_code_is_rejected(data):
 
 
 def test_plan_using_only_codes_is_accepted(data):
-    data["plan"]["affected_areas"] = [
-        {"district": "36"},
-        {"district": "23", "local_levels": [{"name": "23001", "wards": [1, 2, 3]}, {"name": "23002"}]},
-    ]
-    for d in data["government"]["districts"]:
-        d["province"] = {"Gandaki Province": "P4", "Bagmati Province": "P3"}[d["province"]]
-    for ll in data["government"]["local_levels"]:
-        ll["district"] = {"Gorkha": "36", "Sindhupalchok": "23"}[ll["district"]]
     plan = build(data)
     assert plan.covers("23", "23001", 2)
     assert not plan.covers("23", "23001", 9)

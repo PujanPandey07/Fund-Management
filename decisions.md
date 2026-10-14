@@ -1,4 +1,4 @@
-# Fund Management System: Architectural & Implementation Decisions
+﻿# Fund Management System: Architectural & Implementation Decisions
 
 This document records the architectural and business logic decisions made for both packages in the Fund Management System:
 
@@ -48,15 +48,16 @@ This document records the architectural and business logic decisions made for bo
 - **Ordering Rule**: All temporary shelter tranches must strictly precede any main reconstruction/retrofitting tranches.
 - **Currencies**: All amounts are whole integers in Nepalese Rupees (no decimals).
 
-### 1.6 Unique Administrative Codes alongside Names
-- **Decision**: Every government body (`Federal`, `Province`, `District`, `LocalLevel`) supports an optional unique administrative code (`code`, e.g. MoFAGA / CBS Geocodes: `P3`, `23`, `23001`) alongside its official `name`.
-- **Referential Flexibility**:
-  - Administrative links can use **either name or code**:
-    - District `province` can specify the province name (e.g. `"Bagmati Province"`) or code (e.g. `"P3"`).
-    - Local level `district` can specify the district name (e.g. `"Sindhupalchok"`) or code (e.g. `"23"`).
-    - Affected areas can reference districts and local levels by name or code.
+### 1.6 Mandatory Administrative Codes & Code-Only Boundary Links
+- **Decision**: Every government body (`Federal`, `Province`, `District`, `LocalLevel`) **requires** a unique official administrative code (`code: NonEmptyStr`, e.g. MoFAGA / CBS Geocodes: `FED`, `P3`, `23`, `23001`) alongside its official `name`.
+- **Code-Only Boundary Linking**:
+  - Administrative "belongs to" links in the plan strictly use **codes only**:
+    - District `province` must be a valid province code (e.g. `"P3"`).
+    - Local level `district` must be a valid district code (e.g. `"23"`).
+    - Affected areas (`plan.affected_areas`) reference district code (`district`, e.g. `"23"`) and local level code (`code`, e.g. `"23001"`).
 - **Uniqueness Constraints**:
-  - Province codes, district codes, and local level codes must each be unique across the plan.
+  - A code identifies exactly one unit across ALL levels (codes cannot clash between Federal, Province, District, and Local Levels).
+  - Within provinces and within districts, a name must not equal another unit's code.
 
 ---
 

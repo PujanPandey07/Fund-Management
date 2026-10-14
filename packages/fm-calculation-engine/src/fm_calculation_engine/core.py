@@ -15,8 +15,7 @@ rounding drift and no dependence on Python's round().
 from dataclasses import dataclass
 from decimal import Decimal
 
-from fm_plan import ImplementationPlan
-from fm_plan.models import norm
+from fm_plan import ImplementationPlan, norm
 
 from fm_calculation_engine.common import BeneficiaryCount, EngineInputError
 
@@ -111,7 +110,7 @@ def build_district_schedule(
 
     matching_levels = [
         ll for ll in plan.government.local_levels
-        if (norm(ll.district) == norm(district.name) or (district.code and norm(ll.district) == norm(district.code)))
+        if norm(ll.district) == norm(district.code)
     ]
     local_levels = [ll.name for ll in matching_levels]
     local_level_codes = {ll.name: ll.code for ll in matching_levels}

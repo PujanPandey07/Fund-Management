@@ -1,7 +1,6 @@
 from datetime import date
 
-from fm_plan import ImplementationPlan
-from fm_plan.models import NonEmptyStr, StrictModel, norm
+from fm_plan import ImplementationPlan, NonEmptyStr, StrictModel, norm
 
 from fm_calculation_engine.common import (
     BeneficiaryCount,
@@ -93,7 +92,7 @@ def _resolve_entity(
     federal = plan.government.federal
     canonical_code = None
 
-    if norm(entity_name) == norm(federal.name) or (federal.code and norm(entity_name) == norm(federal.code)):
+    if norm(entity_name) == norm(federal.name) or norm(entity_name) == norm(federal.code):
         entity_type = "federal"
         canonical_name = federal.name
         canonical_code = federal.code
@@ -105,7 +104,7 @@ def _resolve_entity(
         managed_districts = [
             d.name
             for d in plan.government.districts
-            if norm(d.province) == norm(prov_obj.name) or (prov_obj.code and norm(d.province) == norm(prov_obj.code))
+            if norm(d.province) == norm(prov_obj.code)
         ]
     else:
         # Check local levels
@@ -118,12 +117,13 @@ def _resolve_entity(
 
         locals_found = plan.government.find_local_level(entity_name, district_identifier=dist_filter_name)
         if not locals_found:
-            # Check if entity exists in another district when district wasn't given
-            all_matching = plan.government.find_local_level(entity_name)
-            if all_matching:
-                raise EngineInputError(
-                    f"Local government '{all_matching[0].name}' is not in district '{district}' in this plan."
-                )
+            # Check if entity exists in another district when district was given
+            if district is not None:
+                all_matching = plan.government.find_local_level(entity_name)
+                if all_matching:
+                    raise EngineInputError(
+                        f"Local government '{all_matching[0].name}' is not in district '{district}' in this plan."
+                    )
             raise EngineInputError(
                 f"Government entity '{entity_name}' was not found in the plan's government structure."
             )
