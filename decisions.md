@@ -1,4 +1,4 @@
-﻿# Fund Management System: Architectural & Implementation Decisions
+# Fund Management System: Architectural & Implementation Decisions
 
 This document records the architectural and business logic decisions made for both packages in the Fund Management System:
 
@@ -98,11 +98,11 @@ This document records the architectural and business logic decisions made for bo
   - Liable to **all affected districts** in the plan where beneficiaries reside.
   - Share: `government_liability.federal` (e.g., 50%).
 - **Province Government**:
-  - Liable **only to districts within its province boundary** (`district.province == province.name`).
+  - Liable **only to districts within its province boundary** (`district.province == province.code` — the district's `province` field holds the province code).
   - Beneficiaries in districts outside this province are excluded from its liability.
   - Share: `government_liability.province` (e.g., 30%).
 - **Local Government**:
-  - Liable **only to its own district / local jurisdiction** (`local_level.district == district.name`).
+  - Liable **only to its own district / local jurisdiction** (`local_level.district == district.code` — the local level's `district` field holds the district code).
   - Share: `government_liability.local` (e.g., 20%).
   - The district's local share is split between its local levels in proportion to what each one must pay out (largest remainder), so the local governments together owe exactly the district's local share.
   - A local-level name may exist in more than one district. Then the profile must say which one with `district`, otherwise it is rejected. `district` is not allowed for federal or province.

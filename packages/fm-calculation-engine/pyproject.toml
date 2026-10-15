@@ -4,11 +4,11 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "disaster-fund-calculation-engine"
-version = "0.1.0"
+version = "0.1.1"
 description = "Disaster Reconstruction & Relief Fund Calculation Engine: Multi-Tranche Liabilities, Donation Offsets, and District Pooling"
 readme = "README.md"
 requires-python = ">=3.10"
-license = { text = "MIT" }
+license = "MIT"
 authors = [{ name = "Pujan Pandey", email = "arghakhanchipujan@gmail.com" }]
 keywords = ["disaster-relief", "fund-management", "reconstruction", "nepal", "grants", "calculation-engine", "tranches"]
 classifiers = [
@@ -18,14 +18,13 @@ classifiers = [
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
     "Programming Language :: Python :: 3.14",
-    "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
     "Topic :: Office/Business :: Financial :: Accounting",
     "Development Status :: 3 - Alpha",
 ]
 
 dependencies = [
-    "disaster-fund-plan>=0.1.0",
+    "disaster-fund-plan>=0.1.1",
     "pydantic>=2",
 ]
 

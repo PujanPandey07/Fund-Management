@@ -1,4 +1,4 @@
-﻿# disaster-fund-plan
+# disaster-fund-plan
 
 **Describe a disaster reconstruction plan in one JSON file, and get it checked before any money is calculated.**
 
@@ -20,8 +20,8 @@ A plan is a single JSON file that says:
 
 | Section | What it says | Example |
 | --- | --- | --- |
-| `plan` | Which disaster, which plan, when it applies, and which areas are affected | Gorkha Earthquake, Housing Reconstruction v1, districts Gorkha and Sindhupalchok |
-| `government` | The administrative tree: Federal â†’ Provinces â†’ Districts â†’ Local levels, each optionally with an official code | Sindhupalchok (`23`) is in Bagmati Province (`P3`) and is a `Pahad` district |
+| `plan` | Which disaster, which plan, when it applies, and which areas are affected | Gorkha Earthquake, Housing Reconstruction v1, districts `36` (Gorkha) and `23` (Sindhupalchok) |
+| `government` | The administrative tree: Federal → Provinces → Districts → Local levels, each with a required official code | District `23` (Sindhupalchok) belongs to province `P3`, and is a `Pahad` district |
 | `regions`, `disaster_types`, `solution_types` | The allowed categories | `Himal / Pahad / Terai`, `Earthquake`, `Reconstruction / Retrofitting` |
 | `grant_matrix` | How much a household receives, tranche by tranche, for every region + disaster + solution combination | Pahad + Earthquake + Reconstruction: 15,000 + 15,000 (shelter), 100,000 + 100,000 + 70,000 (main) |
 | `government_liability` | Who pays what share: Federal %, Province %, Local % (must total 100) | 50 / 30 / 20 |
@@ -104,21 +104,23 @@ print([(t.stage, t.amount) for t in row.tranches])
 # [('shelter', 15000), ('shelter', 15000), ('main', 100000), ('main', 100000), ('main', 70000)]
 ```
 
-The package guarantees the matrix has **no gaps** (every region Ã— disaster Ã— solution has exactly one row) and that **shelter tranches always come before main tranches**, so this lookup always succeeds for a valid combination. For a ready-made per-household schedule, use the engine package (its `receivable_amounts` function).
+The package guarantees the matrix has **no gaps** (every region × disaster × solution has exactly one row) and that **shelter tranches always come before main tranches**, so this lookup always succeeds for a valid combination. For a ready-made per-household schedule, use the engine package (its `receivable_amounts` function).
 
 ### 5. Resolve administrative units by name or code
 
-Master data often arrives with codes in one system and names in another.
+Master data often arrives with codes in one system and names in another. The query API accepts either.
 
 ```python
 gov = plan.government
-gov.find_district("23").name       # 'Sindhupalchok'
-gov.find_district("gorkha").code   # '36'
-gov.find_province("P3").name       # 'Bagmati Province'
-gov.find_local_level("23001")      # [LocalLevel(name='Melamchi Municipality', ...)]
+gov.find_district("23").name        # 'Sindhupalchok'
+gov.find_district("gorkha").code    # '36'
+gov.find_province("P3").name        # 'Bagmati Province'
+gov.find_local_level("23001")       # [LocalLevel(name='Melamchi Municipality', code='23001', ...)]
 ```
 
 `find_local_level` returns a list because two districts can legitimately have a local level with the same name; pass the district as the second argument to narrow it down.
+
+> **Note:** The query API (Python) accepts both names and codes. Only the **plan file format** requires codes for the "belongs-to" links — see the Minimal plan file section.
 
 ### 6. Build a plan in code, save it, and load it again
 
@@ -157,9 +159,9 @@ warnings.simplefilter("error", DefaultLiabilityWarning)   # make a missing split
 | Area | Rule |
 | --- | --- |
 | Dates | Disaster has a start **and** end date; end is not before start. The plan's effective date must start **after** the disaster ends. |
-| Hierarchy & Boundary Links | Every district links to an existing province code; every local level links to an existing district code. Affected areas reference district and local level codes. No duplicate names or codes. |
-| Codes | Codes are mandatory on all units (Federal, Province, District, LocalLevel). A code identifies exactly one unit across **all** levels (the Federal code `FED`, a province `P3`, a district `23` and a local level `23001` can never overlap). A province or district name may not equal another unit's code. Codes are compared as text, so `036` and `36` are different. |
-| Affected areas | Every listed district and local level exists in the `government` section; no district or local level is listed twice. |
+| Hierarchy & Boundary Links | Every district's `province` field must be a valid **province code**; every local level's `district` field must be a valid **district code**. Affected areas reference districts and local levels by **code**. No duplicate names or codes. |
+| Codes | Codes are **mandatory** on all units (Federal, Province, District, LocalLevel). A code identifies exactly one unit across **all** levels (the Federal code `FED`, a province `P3`, a district `23` and a local level `23001` can never overlap). A province or district name may not equal another unit's code. Codes are compared as text, so `036` and `36` are different. |
+| Affected areas | Every listed district code and local level code exists in the `government` section; no district or local level is listed twice. |
 | Regions | Every district's region is in `regions` (`Himal`, `Pahad`, `Terai`). |
 | Grant matrix | Every row uses known region / disaster / solution names; no repeated row; **no missing combination**. |
 | Tranches | Amounts are whole rupees above zero; stage is `shelter` or `main`; shelter tranches come first. |
@@ -172,12 +174,14 @@ The ID is computed, never typed:
 
 ```
 <disaster name>-<disaster start year>-<plan name>-v<plan version>
-Gorkha Earthquake, 2015, Housing Reconstruction, version 1  â†’  gorkha-earthquake-2015-housing-reconstruction-v1
+Gorkha Earthquake, 2015, Housing Reconstruction, version 1  →  gorkha-earthquake-2015-housing-reconstruction-v1
 ```
 
 Changing the plan version creates a new ID, so results from different plan versions can never be mixed up.
 
 ## Minimal plan file
+
+All `code` fields are **required**. The `province` on each district and the `district` on each local level must be **codes**, not names. Affected areas reference districts and local levels by **code**.
 
 ```json
 {
@@ -187,29 +191,68 @@ Changing the plan version creates a new ID, so results from different plan versi
     "disaster_name": "Gorkha Earthquake",
     "disaster_date_range": { "start": "2015-04-25", "end": "2015-05-12" },
     "effective_date_range": { "start": "2015-09-01", "end": null },
-    "affected_areas": [ { "district": "36" } ]
+    "affected_areas": [
+      { "district": "36" },
+      {
+        "district": "23",
+        "local_levels": [
+          { "code": "23001", "wards": [1, 2, 3] },
+          { "code": "23002" }
+        ]
+      }
+    ]
   },
   "government": {
     "federal": { "name": "Government of Nepal", "code": "FED" },
-    "provinces": [ { "name": "Gandaki Province", "code": "P4" } ],
-    "districts": [ { "name": "Gorkha", "code": "36", "province": "P4", "region": "Pahad" } ],
-    "local_levels": [ { "name": "Gorkha Municipality", "code": "36001", "district": "36" } ]
+    "provinces": [
+      { "name": "Gandaki Province", "code": "P4" },
+      { "name": "Bagmati Province", "code": "P3" }
+    ],
+    "districts": [
+      { "name": "Gorkha",        "code": "36", "province": "P4", "region": "Pahad" },
+      { "name": "Sindhupalchok", "code": "23", "province": "P3", "region": "Pahad" }
+    ],
+    "local_levels": [
+      { "name": "Gorkha Municipality",         "code": "36001", "district": "36" },
+      { "name": "Melamchi Municipality",        "code": "23001", "district": "23" },
+      { "name": "Helambu Rural Municipality",   "code": "23002", "district": "23" }
+    ]
   },
   "government_liability": { "federal": 50, "province": 30, "local": 20 },
   "regions": ["Pahad"],
   "disaster_types": ["Earthquake"],
-  "solution_types": ["Reconstruction"],
+  "solution_types": ["Reconstruction", "Retrofitting"],
   "grant_matrix": [
     {
       "region": "Pahad", "disaster_type": "Earthquake", "solution_type": "Reconstruction",
       "tranches": [
         { "stage": "shelter", "amount": 15000 },
-        { "stage": "main", "amount": 100000 }
+        { "stage": "main",    "amount": 100000 }
+      ]
+    },
+    {
+      "region": "Pahad", "disaster_type": "Earthquake", "solution_type": "Retrofitting",
+      "tranches": [
+        { "stage": "shelter", "amount": 50000 },
+        { "stage": "main",    "amount": 150000 }
       ]
     }
   ]
 }
 ```
+
+### Plan file key rules at a glance
+
+| Field | Required | Value format |
+| --- | --- | --- |
+| `government.federal.code` | **Yes** | Non-empty text (e.g. `"FED"`) |
+| `government.provinces[].code` | **Yes** | Non-empty text (e.g. `"P3"`, `"P4"`) |
+| `government.districts[].code` | **Yes** | Non-empty text (e.g. `"23"`, `"36"`) |
+| `government.districts[].province` | **Yes** | Province **code** (e.g. `"P4"`) — not the name |
+| `government.local_levels[].code` | **Yes** | Non-empty text (e.g. `"23001"`) |
+| `government.local_levels[].district` | **Yes** | District **code** (e.g. `"23"`) — not the name |
+| `plan.affected_areas[].district` | **Yes** | District **code** (e.g. `"36"`) — not the name |
+| `plan.affected_areas[].local_levels[].code` | **Yes** | Local level **code** (e.g. `"23001"`) |
 
 ## API summary
 

@@ -1,4 +1,4 @@
-﻿# Fund Management for Disaster Reconstruction
+# Fund Management for Disaster Reconstruction
 
 Two Python packages for the core of a disaster reconstruction fund system. One describes **what the plan is**; the other works out **the money**.
 
@@ -182,12 +182,12 @@ All values in the sample file (`example_plan.json`) are made up. Only the shape 
 
 Each entry starts with a district and can be narrowed to local levels and wards, depending on how much detail is known.
 
-| Field                  | Type                  | Required | Meaning                                | Rules                                                                       |
-| ---------------------- | --------------------- | -------- | -------------------------------------- | --------------------------------------------------------------------------- |
-| `district`             | text                  | Yes      | District name                          | Must exist in `government.districts`; listed only once                      |
-| `local_levels`         | list                  | No       | Narrows the area to these local levels | Empty or missing means the **whole district**                               |
-| `local_levels[].name`  | text                  | Yes      | Local level name                       | Must belong to that district in `government.local_levels`; listed only once |
-| `local_levels[].wards` | list of whole numbers | No       | Narrows to these wards                 | Empty or missing means the **whole local level**; each number above zero    |
+| Field                  | Type                  | Required | Meaning                                | Rules                                                                            |
+| ---------------------- | --------------------- | -------- | -------------------------------------- | -------------------------------------------------------------------------------- |
+| `district`             | text                  | Yes      | District **code** (e.g. `"36"`)        | Must match a district's `code` in `government.districts`; listed only once       |
+| `local_levels`         | list                  | No       | Narrows the area to these local levels | Empty or missing means the **whole district**                                    |
+| `local_levels[].code`  | text                  | Yes      | Local level **code** (e.g. `"23001"`)  | Must match a local level's `code` in `government.local_levels`; listed only once |
+| `local_levels[].wards` | list of whole numbers | No       | Narrows to these wards                 | Empty or missing means the **whole local level**; each number above zero         |
 
 ### 4.4 `government`
 
@@ -201,16 +201,16 @@ Each entry starts with a district and can be narrowed to local levels and wards,
 | Entry            | Field      | Type | Meaning                                   | Rules                                                                        |
 | ---------------- | ---------- | ---- | ----------------------------------------- | ---------------------------------------------------------------------------- |
 | `provinces[]`    | `name`     | text | Province name                             | Unique                                                                       |
-| `provinces[]`    | `code`     | text | Province code (e.g. `P3`, `P4`)           | Optional; unique if given                                                    |
+| `provinces[]`    | `code`     | text | Province code (e.g. `P3`, `P4`)           | **Required**; unique across the entire plan                                  |
 | `districts[]`    | `name`     | text | District name                             | Unique                                                                       |
-| `districts[]`    | `code`     | text | District code (e.g. `23`, `36`)           | Optional; unique if given                                                    |
-| `districts[]`    | `province` | text | The province it belongs to (name or code) | Must match a province's `name` or `code`                                     |
+| `districts[]`    | `code`     | text | District code (e.g. `23`, `36`)           | **Required**; unique across the entire plan                                  |
+| `districts[]`    | `province` | text | The province it belongs to                | **Province code only** (e.g. `"P4"`) — names are not accepted here          |
 | `districts[]`    | `region`   | text | Himal, Pahad or Terai                     | Must be in `regions`                                                         |
 | `local_levels[]` | `name`     | text | Local level name                          | Unique within its district (the same name may appear in different districts) |
-| `local_levels[]` | `code`     | text | Local level code (e.g. `23001`, `36001`)  | Optional; unique across the plan if given                                    |
-| `local_levels[]` | `district` | text | The district it belongs to (name or code) | Must match a district's `name` or `code`                                     |
+| `local_levels[]` | `code`     | text | Local level code (e.g. `23001`, `36001`)  | **Required**; unique across the entire plan                                  |
+| `local_levels[]` | `district` | text | The district it belongs to                | **District code only** (e.g. `"23"`) — names are not accepted here          |
 
-The `province` on a district and the `district` on a local level are the **"belongs to" links**. They accept either official names or codes. They are how the system knows which province pays into which district, and which local levels a district hands money to. All engine lookups (`DistrictProfile`, `GovEntityProfile`, `BeneficiaryCount`) support lookup by either name or code, and reports include both.
+The `province` on a district and the `district` on a local level are the **"belongs to" links**. They **must be codes** — the system uses these links to determine which province pays into which district and which local levels a district hands money to. The Python query API (`find_district()`, `find_province()`, `find_local_level()`, `covers()`, `is_affected()`) and all engine lookup functions still accept **either name or code**; only the plan file's boundary-link fields require codes.
 
 ### 4.5 Lists
 
@@ -290,7 +290,7 @@ The three must add up to exactly 100. Decimals such as `33.33` are allowed.
 | Affected areas | At least one area; no district listed twice; no local level listed twice within a district                                   |
 | Affected areas | Every district and local level exists in `government`, with the local level under the right district                         |
 | Government     | No duplicate provinces or districts; no duplicate local level within a district                                              |
-| Government     | Every district names a province that exists; every local level names a district that exists                                  |
+| Government     | Every district's `province` must be a valid province **code**; every local level's `district` must be a valid district **code**              |
 | Lists          | `regions`, `disaster_types` and `solution_types` are not empty and have no duplicates                                        |
 | Districts      | Every district's `region` is in `regions`                                                                                    |
 | Grant matrix   | Every row uses names that are in the three lists                                                                             |
@@ -643,7 +643,7 @@ Fund-Management/
 â”œâ”€â”€ .gitignore                      Keeps venvs, build output and caches out of git
 â”œâ”€â”€ packages/
 â”‚   â”œâ”€â”€ fm-plan/                    PyPI package: disaster-fund-plan
-â”‚   â”‚   â”œâ”€â”€ pyproject.toml          Package metadata & build config (v0.1.0)
+â”‚   â”‚   â”œâ”€â”€ pyproject.toml          Package metadata & build config (v0.1.1)
 â”‚   â”‚   â”œâ”€â”€ README.md               PyPI README for disaster-fund-plan
 â”‚   â”‚   â””â”€â”€ src/fm_plan/            Package source code
 â”‚   â”‚       â”œâ”€â”€ __init__.py
@@ -651,7 +651,7 @@ Fund-Management/
 â”‚   â”‚       â”œâ”€â”€ loader.py
 â”‚   â”‚       â””â”€â”€ models.py
 â”‚   â””â”€â”€ fm-calculation-engine/      PyPI package: disaster-fund-calculation-engine
-â”‚       â”œâ”€â”€ pyproject.toml          Package metadata & build config (v0.1.0, depends on disaster-fund-plan>=0.1.0)
+â”‚       â”œâ”€â”€ pyproject.toml          Package metadata & build config (v0.1.1, depends on disaster-fund-plan>=0.1.1)
 â”‚       â”œâ”€â”€ README.md               PyPI README for disaster-fund-calculation-engine
 â”‚       â””â”€â”€ src/fm_calculation_engine/ Package source code
 â”‚           â”œâ”€â”€ __init__.py

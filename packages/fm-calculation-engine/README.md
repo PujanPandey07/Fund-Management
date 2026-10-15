@@ -1,11 +1,11 @@
-﻿# disaster-fund-calculation-engine
+# disaster-fund-calculation-engine
 
 **Turn a validated disaster plan plus beneficiary counts into exact rupee figures: what a household receives, what each government owes, and what each district collects and forwards.**
 
 It is the calculation half of the system. The plan itself (structure, grant rates, liability split) comes from [`disaster-fund-plan`](https://pypi.org/project/disaster-fund-plan/), which is installed automatically.
 
 - Python 3.10 or newer
-- Dependencies: `disaster-fund-plan`, `pydantic>=2`
+- Dependencies: `disaster-fund-plan>=0.1.1`, `pydantic>=2`
 - Import name: `fm_calculation_engine` (the PyPI name is `disaster-fund-calculation-engine`)
 
 ```bash
@@ -46,6 +46,15 @@ counts = [
 ]
 ```
 
+You can also use codes instead of names — the engine accepts either:
+
+```python
+counts = [
+    {"district": "36", "local_level": "36001", "disaster_type": "Earthquake", "solution_type": "Reconstruction", "count": 10},
+    {"district": "23", "local_level": "23001", "disaster_type": "Earthquake", "solution_type": "Reconstruction", "count": 20},
+]
+```
+
 | Field | Required | Notes |
 | --- | --- | --- |
 | `district` | yes | Name **or code** (`"Sindhupalchok"` or `"23"`) |
@@ -53,7 +62,8 @@ counts = [
 | `count` | yes | Number of households, `0` or more |
 | `local_level` | no | Name or code. If omitted, see [use case 6](#6-counts-without-a-local-level) |
 | `region` | no | Taken from the plan's district. If you supply it, it must match the plan |
-| `district_code`, `local_level_code` | no | Optional cross-check (non-empty strings). If given, they must match the plan's code for that district / local level, otherwise the row is rejected (a local-level code needs a `local_level`) |
+| `district_code` | no | Optional cross-check (non-empty string). If given, must match the plan's code for that district |
+| `local_level_code` | no | Optional cross-check (non-empty string). If given, must match the plan's code for that local level (requires `local_level` to be set) |
 
 **3. A profile** for the question you are asking (shown in each use case below). Every profile carries the `plan_id`, which must match the loaded plan: this stops results being calculated against the wrong plan version.
 
@@ -135,9 +145,9 @@ for t in fed.tranches[:3]:
 
 ```text
 tranche  gross      donation applied  net payable  donation left
-1        350,000    350,000           0            50,000      â† 400,000 donated, tranche 1 consumes 350,000
-2        350,000     50,000           300,000      0           â† the 50,000 left over rolls into tranche 2
-3        1,500,000         0          1,500,000    0           â† donations are used up
+1        350,000    350,000           0            50,000      ← 400,000 donated, tranche 1 consumes 350,000
+2        350,000     50,000           300,000      0           ← the 50,000 left over rolls into tranche 2
+3        1,500,000         0          1,500,000    0           ← donations are used up
 ```
 
 Totals: Rs. 400,000 received, Rs. 4,750,000 gross, **Rs. 4,350,000 net cash payable**. The relief inside each tranche is shared across districts in proportion to what each district needs (`tranches[i].districts[j].donation_offset`).
@@ -246,15 +256,15 @@ calculate_government_liability(plan, {
 - **One schedule per district.** District total = Federal + Province + Local share, and the local share = the sum of the shares given to its local levels, exactly. Outputs 2 and 3 therefore always reconcile.
 - **Deterministic.** The same input always gives the same output (ties are broken by plan order).
 - **Wrong plan is rejected.** A `plan_id` that does not match the loaded plan is an error.
-- **Names or codes everywhere.** Districts, provinces, local levels and the Federal government can all be given by name or official code, in any capitalisation.
+- **Names or codes everywhere.** Districts, provinces, local levels and the Federal government can all be given by name or official code, in any capitalisation, in beneficiary counts and profiles. Only the **plan file** itself requires codes in boundary-link fields.
 
 ## API summary
 
 | Name | Purpose |
 | --- | --- |
-| `receivable_amounts(plan, profile)` â†’ `ReceivableAmounts` | Output 1: tranche schedule for one household |
-| `calculate_government_liability(plan, profile, counts)` â†’ `GovernmentLiabilityOutput` | Output 2: what a government owes, with donation offsets and rollover |
-| `calculate_district_fund(plan, profile, counts)` â†’ `DistrictOutput` | Output 3: what a district collects and forwards |
+| `receivable_amounts(plan, profile)` → `ReceivableAmounts` | Output 1: tranche schedule for one household |
+| `calculate_government_liability(plan, profile, counts)` → `GovernmentLiabilityOutput` | Output 2: what a government owes, with donation offsets and rollover |
+| `calculate_district_fund(plan, profile, counts)` → `DistrictOutput` | Output 3: what a district collects and forwards |
 | `validate_beneficiary_counts(plan, counts)` | Check counts against the plan; returns normalised `BeneficiaryCount` objects |
 | `EngineInputError` | Raised for any invalid input; the message lists every problem |
 | `BeneficiaryProfile`, `GovEntityProfile`, `DistrictProfile`, `BeneficiaryCount`, `Donation` | Input models (a plain `dict` with the same keys works too) |
